@@ -97,20 +97,21 @@ function toCodexPath(p) {
   return String(p).replaceAll('\\', '/');
 }
 
-// Strip the shell-wrapper prefix codex adds to commands on different platforms
-// so the actual command shows in the live progress line.
-// Examples:
-//   `"C:\WINDOWS\...\powershell.exe" -Command 'rg --files'`  →  `rg --files`
-//   `bash -c 'grep -r foo'`                                  →  `grep -r foo`
+// Strip the shell-wrapper prefix codex adds to commands so the meaningful
+// part shows in the live progress line. Two layers:
+//   1. Outer shell: `"...\powershell.exe" -Command '<inner>'`, `bash -c '<inner>'`, `cmd /c '<inner>'`
+//   2. Inner boilerplate: codex's PowerShell line-numbering idiom
+//      `$i=0; Get-Content -LiteralPath '<file>' | ForEach-Object { "$i++; ..." }` → `Get-Content -LiteralPath '<file>'`
 function stripShellWrapper(cmd) {
   if (typeof cmd !== 'string') return cmd;
-  let m = cmd.match(/powershell(?:\.exe)?["']?\s+-Command\s+['"]?([\s\S]+?)['"]?$/i);
-  if (m) return m[1];
-  m = cmd.match(/(?:^|\/)(?:bash|sh|zsh)(?:\.exe)?["']?\s+-c\s+['"]?([\s\S]+?)['"]?$/);
-  if (m) return m[1];
-  m = cmd.match(/^cmd(?:\.exe)?\s+\/[a-z]+\s+['"]?([\s\S]+?)['"]?$/i);
-  if (m) return m[1];
-  return cmd;
+  let inner = cmd;
+  let m = inner.match(/powershell(?:\.exe)?["']?\s+-Command\s+['"]?([\s\S]+?)['"]?$/i);
+  if (m) inner = m[1];
+  else if ((m = inner.match(/(?:^|\/)(?:bash|sh|zsh)(?:\.exe)?["']?\s+-c\s+['"]?([\s\S]+?)['"]?$/))) inner = m[1];
+  else if ((m = inner.match(/^cmd(?:\.exe)?\s+\/[a-z]+\s+['"]?([\s\S]+?)['"]?$/i))) inner = m[1];
+  // Drop the `$i=0; ... | ForEach-Object { ... }` line-numbering noise
+  inner = inner.replace(/^\$i\s*=\s*0\s*;\s*/i, '').replace(/\s*\|\s*ForEach-Object\s*\{[\s\S]*\}\s*$/i, '');
+  return inner.trim();
 }
 
 // Compact one-line summary of a codex JSONL event, for live progress on stderr.
@@ -118,7 +119,7 @@ function stripShellWrapper(cmd) {
 // of started/completed pairs for successful commands).
 function summarizeEvent(evt) {
   const t = evt?.type;
-  const trunc = (s, n = 80) => {
+  const trunc = (s, n = 100) => {
     const flat = String(s ?? '').replace(/\s+/g, ' ').trim();
     return flat.length > n ? flat.slice(0, n - 1) + '…' : flat;
   };
@@ -143,7 +144,7 @@ function summarizeEvent(evt) {
     const it = evt.item;
     if (!it) return null;
     if (it.type === 'agent_message' && typeof it.text === 'string') {
-      return `[codex] message (${it.text.length} chars)`;
+      return `[codex] » ${trunc(it.text, 100)}`;
     }
     if (it.type === 'command_execution') {
       const code = it.exit_code ?? it.exitCode;
