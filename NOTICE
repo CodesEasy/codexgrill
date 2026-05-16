@@ -1,0 +1,12 @@
+codexgrill
+Copyright 2026 codeseasy
+Licensed under the MIT License.
+
+Runtime dependency on the OpenAI Codex CLI (not redistributed):
+
+  https://github.com/openai/codex
+  Copyright OpenAI
+  Licensed under the Apache License, Version 2.0
+
+Users must install the Codex CLI separately (`npm install -g @openai/codex`,
+then `codex login`) for codexgrill to function.

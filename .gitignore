@@ -1,0 +1,7 @@
+# codexgrill run artifacts
+.claude
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.reference
