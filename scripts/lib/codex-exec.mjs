@@ -16,6 +16,59 @@ import readline from 'node:readline';
 
 export const VALID_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
 
+// Paths that auto-mutate while the user has an IDE / editor open. We skip
+// these in the working-tree containment check so they never trip a false
+// positive. Anything not listed here that changes still triggers the
+// neutral "was this you or Codex?" prompt — the command files offer to
+// add such paths to .gitignore.
+export const DEFAULT_IGNORED_PATTERNS = [
+  // IDE config / state (JetBrains family, Visual Studio, VSCode, Cursor)
+  '.idea/**',
+  '.vs/**',
+  '.vscode/**',
+  '.cursor/**',
+  '.history/**',
+  '*.suo',
+  '*.user',
+  // Editor swap / backup files
+  '*.swp',
+  '*.swo',
+  '*~',
+  '*.bak',
+  // OS / metadata
+  '.DS_Store',
+  'Thumbs.db',
+  'desktop.ini',
+];
+
+// Minimal glob matcher for DEFAULT_IGNORED_PATTERNS. Supports:
+//   - exact path:      `.idea/workspace.xml`
+//   - prefix glob:     `.idea/**`              (matches anything under the prefix)
+//   - suffix glob:     `*.swp`, `*~`           (matches any path ending with the literal suffix)
+//   - bare basename:   `Thumbs.db`             (matches that basename anywhere)
+// Path is normalized to forward slashes before matching.
+export function matchesIgnorePattern(filePath, patterns = DEFAULT_IGNORED_PATTERNS) {
+  const p = String(filePath).replaceAll('\\', '/');
+  for (const pattern of patterns) {
+    if (pattern.endsWith('/**')) {
+      const prefix = pattern.slice(0, -3);
+      if (p === prefix || p.startsWith(prefix + '/')) return true;
+      continue;
+    }
+    if (pattern.startsWith('*') && !pattern.slice(1).includes('*') && !pattern.includes('/')) {
+      if (p.endsWith(pattern.slice(1))) return true;
+      continue;
+    }
+    if (!pattern.includes('/') && !pattern.includes('*')) {
+      // Bare basename — match anywhere in tree
+      if (p === pattern || p.endsWith('/' + pattern)) return true;
+      continue;
+    }
+    if (p === pattern) return true;
+  }
+  return false;
+}
+
 // On Windows the `codex` binary installed by npm is `codex.cmd` (a batch shim).
 // Node's `spawn` does NOT search PATHEXT, so it can't find .cmd files directly —
 // we have to delegate the PATH lookup to cmd.exe via `shell: true`. Mirrors the

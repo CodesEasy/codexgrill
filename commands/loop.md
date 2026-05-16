@@ -101,7 +101,7 @@ Read the stderr marker `WORKING_TREE_CHANGED:<comma-separated-files>` and `$RUN_
 
 Wait for the user's answer. Do not call `ExitPlanMode`.
 
-- **User says yes (they edited) — continue the loop:** acknowledge ("OK, continuing the loop") and resume at iter `<i+1>`. **No special handling needed** — the next iteration's wrapper run takes a fresh `snapshotBefore` that already includes the user's edits as the new baseline, so they won't re-trip. Do not "reset" anything.
+- **User says yes (they edited / it was their IDE) — continue the loop:** acknowledge ("OK, continuing the loop") and resume at iter `<i+1>`. **No special handling needed** — the next iteration's wrapper run takes a fresh `snapshotBefore` that already includes the user's edits as the new baseline, so they won't re-trip. Do not "reset" anything. Additionally, **if the changed file looks like auto-generated noise that's currently tracked** (e.g., `.idea/*.iml`, build artifacts, framework caches — anything the user wouldn't intentionally edit), ask: "Want me to add `<file>` to `.gitignore` so this check doesn't trip on it again? Only say yes if it's truly auto-generated — committing it might be intentional." If yes, append the path (or a sensible pattern like `<dir>/`) to the project's root `.gitignore` before resuming.
 - **User says no / "it must be Codex":** say:
   > Then this looks like Codex breaking the read-only contract. What would you like me to do?
   > - **Revert** the working tree to the state right before iter `<i>` started (we saved a `git stash` snapshot). I'll run `git stash apply <preIterStash.hash>`.

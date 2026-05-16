@@ -65,7 +65,7 @@ Read the stderr marker `WORKING_TREE_CHANGED:<comma-separated-files>` and `$RUN_
 
 Halt. Do **not** edit the plan. Do **not** call `ExitPlanMode`. Wait for the user.
 
-- **User says yes (they edited):** acknowledge ("OK — leaving things as they are") and stop. The user can re-invoke when ready.
+- **User says yes (they edited / it was their IDE):** acknowledge ("OK — leaving things as they are"). Then, **if the changed file looks like auto-generated noise that's currently tracked** (e.g., `.idea/*.iml`, build artifacts, framework caches — anything the user wouldn't intentionally edit), ask: "Want me to add `<file>` to `.gitignore` so this check doesn't trip on it again? Only say yes if it's truly auto-generated — committing it might be intentional." If yes, append the path (or a sensible pattern like `<dir>/`) to the project's root `.gitignore`. Then stop — user can re-invoke when ready.
 - **User says no / "it must be Codex":** say:
   > Then this looks like Codex breaking the read-only contract. What would you like me to do?
   > - **Revert** the working tree to the state right before this run started (we saved a `git stash` snapshot). I'll run `git stash apply <hash>`.

@@ -28,6 +28,7 @@ import {
   snapshotWorkingTree,
   assertContainment,
   createPreIterStash,
+  matchesIgnorePattern,
   CodexNotInstalledError,
   CodexExecFailedError,
   WorkingTreeChangedError,
@@ -346,22 +347,25 @@ async function main() {
     throw err;
   }
 
-  // Filter snapshots so the wrapper's own run-dir artifacts (prompt.txt,
-  // codex.jsonl, final.txt, result.json) never trip containment — they're
-  // created by us between snapshotBefore and snapshotAfter. The check only
-  // fires for changes outside the run-dir.
+  // Filter snapshots so two classes of paths never trip containment:
+  //   1. The wrapper's own run-dir artifacts (prompt.txt, codex.jsonl, final.txt,
+  //      result.json) — created by us between snapshotBefore and snapshotAfter.
+  //   2. Auto-mutating IDE/OS state (`.idea/workspace.xml`, `.vs/`, `*.swp`,
+  //      `.DS_Store`, …) — these change constantly while the user has their
+  //      editor open and aren't source code Codex would meaningfully touch.
   const runDirRel = path.relative(cwd, runDir).split(path.sep).join('/');
-  const filterRunDir = (snap) => {
+  const filterSnapshot = (snap) => {
     const out = {};
     for (const [p, h] of Object.entries(snap)) {
       const normalized = p.split(path.sep).join('/');
       if (runDirRel && (normalized === runDirRel || normalized.startsWith(runDirRel + '/'))) continue;
+      if (matchesIgnorePattern(normalized)) continue;
       out[p] = h;
     }
     return out;
   };
-  const beforeFiltered = filterRunDir(snapshotBefore);
-  const afterFiltered = filterRunDir(snapshotAfter);
+  const beforeFiltered = filterSnapshot(snapshotBefore);
+  const afterFiltered = filterSnapshot(snapshotAfter);
 
   let containmentExit = 0;
   let changedFiles = [];
