@@ -3,7 +3,7 @@ description: Loop Codex review + Claude validation until convergence, then prese
 argument-hint: "[path/to/plan.md] [--max=N] [--effort=<level>] [--model=<name>]"
 ---
 
-Iteratively review and refine a plan with Codex (read-only) and Claude (validates + edits). The loop pins Codex to one thread: iter 1 captures the `thread_id` from Codex's JSONL stream; every later iter passes that UUID to `codex exec resume <id>` so prompt caching covers the bulk of the resumed prompt.
+Iteratively review and refine a plan with Codex (read-only) and Claude (validates + edits). The loop pins Codex to one thread: iter 1 captures the `thread_id` from Codex's JSONL stream; every later iter passes that UUID to `codex exec resume <id>` to preserve conversation context. Every iteration inlines the FULL updated plan in the prompt so Codex always reviews the current text (accuracy first; the cache still covers the template).
 
 Raw arguments: `$ARGUMENTS`
 
@@ -66,7 +66,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
   [--effort <EFFORT>] [--model <MODEL>]
 ```
 
-**Iteration 2+** (resume the pinned thread; the wrapper sends a short delta prompt + cumulative refuted-log — Codex already has the full plan in its thread from iter 1):
+**Iteration 2+** (resume the pinned thread; the wrapper sends the FULL updated plan + cumulative refuted-log every iteration so Codex always reviews the current text):
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
   --plan "<PLAN_PATH>" \

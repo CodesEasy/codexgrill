@@ -13,10 +13,10 @@ v1 grills **plans**. Code review, PR review, and design-doc commands are next.
 1. **Codex reads your plan** via `codex exec` and returns findings — wrong assumptions, missing files, ordering risks, security/perf concerns, stale facts.
 2. **Claude validates each finding** by `Read`-ing the cited file. Every claim is marked CONFIRMED, REFUTED, or UNVERIFIABLE — never accepted from memory.
 3. **The plan is edited** to apply CONFIRMED findings; REFUTED ones are dropped.
-4. **(`:loop` only)** Repeat until both models agree the plan is clean, or `--max` rounds run out. The loop pins Codex to a single thread by passing the `thread_id` from iter 1 back to `codex exec resume <id>` on every later iteration — prompt caching covers the bulk of the resumed prompt, so long loops stay cheap.
+4. **(`:loop` only)** Repeat until both models agree the plan is clean, or `--max` rounds run out. The loop pins Codex to a single thread by passing the `thread_id` from iter 1 back to `codex exec resume <id>` on every later iteration (preserves conversation context and prompt-cache savings on the template). Every iteration inlines the FULL updated plan in the prompt — Codex always reviews the current text, never relies on memory of an earlier version.
 5. The revised plan is re-presented via `ExitPlanMode`.
 
-**Read-only enforcement.** Codex runs with `--yolo` (full sandbox + approval bypass) because the codex sandbox's `read-only` mode blocks command execution and breaks any serious review (you can't run `git log`, `grep`, etc.). Containment is enforced two ways instead:
+**Read-only enforcement.** Codex runs with `--dangerously-bypass-approvals-and-sandbox` (full sandbox + approval bypass) because the codex sandbox's `read-only` mode blocks command execution and breaks any serious review (you can't run `git log`, `grep`, etc.). Containment is enforced two ways instead:
 
 1. The review prompt's `<action_safety>` block tells Codex modifications cause the run to be **REJECTED**.
 2. The wrapper SHA256-hashes every dirty + untracked path in the git working tree before and after every Codex call. Any change → exit `2` (`WORKING_TREE_CHANGED`), loop halts, user decides.

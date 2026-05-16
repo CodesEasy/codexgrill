@@ -193,19 +193,24 @@ async function buildFreshPrompt({ planPath, refutedLogPath }) {
 }
 
 async function buildResumePrompt({ planPath, refutedLogPath }) {
+  const planBody = await fs.readFile(planPath, 'utf8');
   const refuted = await readIfExists(refutedLogPath);
   const parts = [];
   parts.push(
 `I have applied the CONFIRMED findings from your prior review and edited the
-plan accordingly. Please re-review the plan focusing on the changes and any
-new issues. The plan path is \`${planPath}\` (you have file-read access from
-your earlier turn — re-read it if needed).
+plan accordingly. Below is the FULL updated plan — review the current text,
+not your memory of the earlier version. Focus on whether the edits addressed
+the prior findings and on any new issues.
 
 Same READ-ONLY contract as before: do not modify, create, or delete files.
 Same output contract: first-line verdict (SOUND / NEEDS REVISION / FUNDAMENTAL
 ISSUES), bulleted findings with severity + \`path:line\` / URL citations,
 optional "What to add" / "What to remove" / "External refs checked" sections.
+
+<plan_under_review>
 `);
+  parts.push(planBody);
+  parts.push('\n</plan_under_review>\n');
   if (refuted.trim().length > 0) {
     parts.push('\n');
     parts.push(refuted.endsWith('\n') ? refuted : refuted + '\n');
