@@ -37,6 +37,13 @@ function escapeCodexArgs(args) {
   });
 }
 
+// Codex on Windows fails with "os error 2" when --cd receives a backslash path
+// (verified with codex-cli 0.130.0). Forward slashes work for all path flags.
+function toCodexPath(p) {
+  if (process.platform !== 'win32') return p;
+  return String(p).replaceAll('\\', '/');
+}
+
 export class CodexNotInstalledError extends Error {
   constructor(detail) {
     super(`CODEX_NOT_INSTALLED: ${detail}`);
@@ -183,12 +190,11 @@ export async function runCodexExec(opts) {
   }
   args.push(
     '--json',
-    '--yolo',
+    '--dangerously-bypass-approvals-and-sandbox',
     '--ignore-rules',
-    '--search',
     '--skip-git-repo-check',
-    '--cd', cwd,
-    '-o', finalPath,
+    '--cd', toCodexPath(cwd),
+    '-o', toCodexPath(finalPath),
   );
   if (effort != null) {
     args.push('-c', `model_reasoning_effort=${effort}`);
