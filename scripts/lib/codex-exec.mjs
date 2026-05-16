@@ -316,9 +316,13 @@ export async function runCodexExec(opts) {
     '--dangerously-bypass-approvals-and-sandbox',
     '--ignore-rules',
     '--skip-git-repo-check',
-    '--cd', toCodexPath(cwd),
     '-o', toCodexPath(finalPath),
   );
+  // `codex exec resume` doesn't accept --cd (the working dir is inherited from
+  // the session created in iter 1). Only pass --cd for fresh runs.
+  if (mode === 'fresh') {
+    args.push('--cd', toCodexPath(cwd));
+  }
   if (effort != null) {
     args.push('-c', `model_reasoning_effort=${effort}`);
   }
