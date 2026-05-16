@@ -394,6 +394,7 @@ async function main() {
       hash: preIterStash.stashHash,
       refName: preIterStash.refName,
       isEmpty: preIterStash.isEmpty,
+      noHead: preIterStash.noHead === true,
     },
     workingTreeChanged: containmentExit === 2,
     changedFiles,

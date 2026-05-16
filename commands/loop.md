@@ -111,6 +111,8 @@ Wait for the user's answer. Do not call `ExitPlanMode`.
 
   If `preIterStash.isEmpty === true` (clean tree before this iter): there's no stash to apply. The revert is `git reset --hard HEAD` + `git clean -df`. **Both destructive — ask the user to confirm before running.**
 
+  If `preIterStash.noHead === true` (fresh repo, no initial commit): no HEAD, so neither `git stash apply` nor `git reset --hard HEAD` works. The only revert is `git clean -df` for untracked files. Tell the user this and ask whether to run it or stop and let them inspect.
+
 ### C. Print Codex's review
 
 Under `### Codex review (iter <i>)`, paste the wrapper's stdout verbatim. If chat output was truncated, `Read` `$RUN_DIR/final-iter<i>.txt`.

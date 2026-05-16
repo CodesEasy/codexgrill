@@ -384,10 +384,12 @@ export function assertContainment(before, after) {
 // Capture the dirty + untracked working-tree state in a commit without
 // modifying the working tree or the stash list. Pin it with a permanent ref
 // so it survives gc and can be applied later by the user for revert.
-// Returns: { stashHash: string|null, refName: string|null, isEmpty: boolean }.
-// stashHash is null when the working tree is clean (nothing to stash).
+// Returns: { stashHash: string|null, refName: string|null, isEmpty: boolean, noHead?: boolean }.
+// stashHash is null when the working tree is clean (nothing to stash) OR when
+// the repo has no initial commit (HEAD missing). The noHead flag distinguishes
+// the second case so the exit-2 handler can tell the user revert isn't available.
 export async function createPreIterStash(cwd, runId, iter) {
-  const stashHash = await new Promise((resolve, reject) => {
+  const result = await new Promise((resolve, reject) => {
     let child;
     try {
       child = spawn('git', ['stash', 'create', '-u'], { cwd });
@@ -406,16 +408,26 @@ export async function createPreIterStash(cwd, runId, iter) {
           reject(new NotAGitRepoError(cwd));
           return;
         }
+        // Fresh repo with no commits yet — `git stash create` needs HEAD.
+        // Skip the stash cleanly; the run continues, but revert won't be available.
+        if (/do not have the initial commit|bad revision .?HEAD/i.test(stderr)) {
+          resolve({ hash: null, noHead: true });
+          return;
+        }
         reject(new Error(`git stash create failed (${code}): ${stderr.trim() || 'no stderr'}`));
         return;
       }
-      resolve(stdout.trim() || null);
+      resolve({ hash: stdout.trim() || null, noHead: false });
     });
   });
 
-  if (!stashHash) {
+  if (result.noHead) {
+    return { stashHash: null, refName: null, isEmpty: true, noHead: true };
+  }
+  if (!result.hash) {
     return { stashHash: null, refName: null, isEmpty: true };
   }
+  const stashHash = result.hash;
 
   const refName = `refs/codexgrill/${runId}/iter-${iter}-pre`;
   await new Promise((resolve, reject) => {

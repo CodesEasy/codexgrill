@@ -75,6 +75,8 @@ Halt. Do **not** edit the plan. Do **not** call `ExitPlanMode`. Wait for the use
 
   If `preIterStash.isEmpty === true` (clean tree before the run): there's no stash to apply. The revert is `git reset --hard HEAD` (undo tracked changes) + `git clean -df` (remove new untracked files). **Both destructive — ask the user to confirm before running.**
 
+  If `preIterStash.noHead === true` (fresh repo, no initial commit): no HEAD, so neither `git stash apply` nor `git reset --hard HEAD` works. The only revert is `git clean -df` for untracked files (won't touch staged changes). Tell the user this and ask whether to run `git clean -df` or stop and let them inspect.
+
 ### 5. Print Codex's review
 
 Under `### Codex review`, paste the wrapper's stdout verbatim — verdict (SOUND / NEEDS REVISION / FUNDAMENTAL ISSUES) and findings. If chat output was truncated, `Read` `$RUN_DIR/final.txt`.
