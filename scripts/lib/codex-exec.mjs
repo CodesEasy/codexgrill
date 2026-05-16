@@ -44,6 +44,75 @@ function toCodexPath(p) {
   return String(p).replaceAll('\\', '/');
 }
 
+// Strip the shell-wrapper prefix codex adds to commands on different platforms
+// so the actual command shows in the live progress line.
+// Examples:
+//   `"C:\WINDOWS\...\powershell.exe" -Command 'rg --files'`  →  `rg --files`
+//   `bash -c 'grep -r foo'`                                  →  `grep -r foo`
+function stripShellWrapper(cmd) {
+  if (typeof cmd !== 'string') return cmd;
+  let m = cmd.match(/powershell(?:\.exe)?["']?\s+-Command\s+['"]?([\s\S]+?)['"]?$/i);
+  if (m) return m[1];
+  m = cmd.match(/(?:^|\/)(?:bash|sh|zsh)(?:\.exe)?["']?\s+-c\s+['"]?([\s\S]+?)['"]?$/);
+  if (m) return m[1];
+  m = cmd.match(/^cmd(?:\.exe)?\s+\/[a-z]+\s+['"]?([\s\S]+?)['"]?$/i);
+  if (m) return m[1];
+  return cmd;
+}
+
+// Compact one-line summary of a codex JSONL event, for live progress on stderr.
+// Returns null for events that aren't worth showing (avoids noisy double-prints
+// of started/completed pairs for successful commands).
+function summarizeEvent(evt) {
+  const t = evt?.type;
+  const trunc = (s, n = 80) => {
+    const flat = String(s ?? '').replace(/\s+/g, ' ').trim();
+    return flat.length > n ? flat.slice(0, n - 1) + '…' : flat;
+  };
+  if (t === 'thread.started') {
+    const id = typeof evt.thread_id === 'string' ? evt.thread_id.slice(0, 8) : '?';
+    return `[codex] thread ${id} started`;
+  }
+  if (t === 'turn.started') return `[codex] turn started`;
+  if (t === 'item.started') {
+    const it = evt.item;
+    if (!it) return null;
+    if (it.type === 'command_execution') return `[codex] $ ${trunc(stripShellWrapper(it.command))}`;
+    if (it.type === 'web_search') return `[codex] search: ${trunc(it.query)}`;
+    if (it.type === 'file_change') return `[codex] writing ${it.changes?.length ?? '?'} file(s)`;
+    if (it.type === 'reasoning') return `[codex] reasoning…`;
+    if (it.type === 'mcp_tool_call') return `[codex] tool ${it.server ?? '?'}/${it.tool ?? '?'}`;
+    if (it.type === 'dynamic_tool_call') return `[codex] tool ${it.tool ?? '?'}`;
+    if (it.type === 'agent_message') return null;
+    return `[codex] ${it.type}`;
+  }
+  if (t === 'item.completed') {
+    const it = evt.item;
+    if (!it) return null;
+    if (it.type === 'agent_message' && typeof it.text === 'string') {
+      return `[codex] message (${it.text.length} chars)`;
+    }
+    if (it.type === 'command_execution') {
+      const code = it.exit_code ?? it.exitCode;
+      if (code != null && code !== 0) return `[codex] ✗ command (exit ${code})`;
+      return null;
+    }
+    return null;
+  }
+  if (t === 'turn.completed') {
+    const u = evt.usage;
+    if (!u) return `[codex] turn complete`;
+    const parts = [`in=${u.input_tokens}`];
+    if (u.cached_input_tokens != null) parts.push(`cached=${u.cached_input_tokens}`);
+    parts.push(`out=${u.output_tokens}`);
+    if (u.reasoning_output_tokens) parts.push(`reason=${u.reasoning_output_tokens}`);
+    return `[codex] turn complete (${parts.join(', ')})`;
+  }
+  if (t === 'turn.failed') return `[codex] turn FAILED: ${trunc(evt.error?.message ?? evt.error ?? '?', 120)}`;
+  if (t === 'error') return `[codex] ERROR: ${trunc(evt.error?.message ?? evt.message ?? JSON.stringify(evt), 120)}`;
+  return null;
+}
+
 export class CodexNotInstalledError extends Error {
   constructor(detail) {
     super(`CODEX_NOT_INSTALLED: ${detail}`);
@@ -236,6 +305,8 @@ export async function runCodexExec(opts) {
       } catch {
         return;
       }
+      const summary = summarizeEvent(evt);
+      if (summary) process.stderr.write(summary + '\n');
       const t = evt?.type;
       if (t === 'thread.started') {
         if (typeof evt.thread_id === 'string') threadId = evt.thread_id;
