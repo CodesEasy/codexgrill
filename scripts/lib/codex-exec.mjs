@@ -16,6 +16,27 @@ import readline from 'node:readline';
 
 export const VALID_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
 
+// On Windows the `codex` binary installed by npm is `codex.cmd` (a batch shim).
+// Node's `spawn` does NOT search PATHEXT, so it can't find .cmd files directly —
+// we have to delegate the PATH lookup to cmd.exe via `shell: true`. Mirrors the
+// official @openai/codex plugin's process.mjs.
+const CODEX_SPAWN_OPTS = {
+  shell: process.platform === 'win32' ? (process.env.SHELL || true) : false,
+  windowsHide: true,
+};
+
+// With shell:true on Windows, args are concatenated into a single command string
+// without escaping (Node DEP0190). Wrap anything containing whitespace or cmd
+// metachars in double quotes so paths like `C:\My Project\...` survive.
+function escapeCodexArgs(args) {
+  if (process.platform !== 'win32') return args;
+  return args.map((a) => {
+    const s = String(a);
+    if (!/[\s"&|<>^()%!`]/.test(s)) return s;
+    return `"${s.replace(/"/g, '""')}"`;
+  });
+}
+
 export class CodexNotInstalledError extends Error {
   constructor(detail) {
     super(`CODEX_NOT_INSTALLED: ${detail}`);
@@ -75,7 +96,7 @@ export async function assertCodexInstalled() {
   return await new Promise((resolve, reject) => {
     let child;
     try {
-      child = spawn('codex', ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn('codex', escapeCodexArgs(['--version']), { stdio: ['ignore', 'pipe', 'pipe'], ...CODEX_SPAWN_OPTS });
     } catch (err) {
       reject(new CodexNotInstalledError(`failed to spawn 'codex': ${err.message}`));
       return;
@@ -193,7 +214,7 @@ export async function runCodexExec(opts) {
   const result = await new Promise((resolve, reject) => {
     let child;
     try {
-      child = spawn('codex', args, { stdio: ['pipe', 'pipe', 'pipe'] });
+      child = spawn('codex', escapeCodexArgs(args), { stdio: ['pipe', 'pipe', 'pipe'], ...CODEX_SPAWN_OPTS });
     } catch (err) {
       jsonlStream.end();
       reject(new CodexExecFailedError(`failed to spawn 'codex exec': ${err.message}`));
