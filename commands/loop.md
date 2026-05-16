@@ -176,8 +176,8 @@ Before deciding "clean", state the strongest reason it might NOT be — if real,
 
 ### I. Update the plan
 
-- Re-read `PLAN_PATH`. Apply each CONFIRMED finding using your **Action** (may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE → list under `### Unverified items flagged to user (iter <i>)`, not in the plan.
-- Under `### Plan updated (iter <i>)`, list each edit as `- <section> — <change> — <finding>`. Continue to next iteration.
+- Re-read `PLAN_PATH`. Apply each CONFIRMED finding using your **Action** (may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE → list under `### Unverified items flagged to user (iter <i>)` in chat.
+- The plan file is the user's deliverable — keep it as a well-crafted plan with only the actual plan content. Anything plugin-related (iter numbers, validation state, review metadata) stays in `$RUN_DIR` and your chat reply. Edit the plan content directly. In your chat reply, summarize what you changed. Continue to the next iteration.
 
 ### Cap reached without converging
 

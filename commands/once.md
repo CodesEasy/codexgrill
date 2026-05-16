@@ -101,8 +101,9 @@ Then under `#### What Codex missed`, do an independent fresh-eyes pass. End with
 
 ### 7. Update the plan (only if Net verdict is NEEDS REVISION or FUNDAMENTAL ISSUES)
 
-- Apply each CONFIRMED finding (your **Action** may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE items → list under `### Unverified items flagged to user`, not in the plan.
-- `PLAN_SOURCE = arg` → Edit `PLAN_PATH` in place; list edits under `### Plan updated`.
+- Apply each CONFIRMED finding (your **Action** may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE items → list under `### Unverified items flagged to user` in chat.
+- The plan is the user's deliverable — keep it as a well-crafted plan with only the actual plan content. Anything plugin-related (validation state, review metadata) stays in `$RUN_DIR` and your chat reply. Edit the plan content directly. In your chat reply, summarize what you changed.
+- `PLAN_SOURCE = arg` → Edit `PLAN_PATH` in place.
 - `PLAN_SOURCE = inline` → output the revised plan in full under `### Revised plan` (do not edit `$RUN_DIR/plan.md` — it's the audit copy of what Codex saw).
 
 ### 8. Re-present via ExitPlanMode
