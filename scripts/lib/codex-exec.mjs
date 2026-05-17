@@ -70,25 +70,89 @@ export function matchesIgnorePattern(filePath, patterns = DEFAULT_IGNORED_PATTER
   return false;
 }
 
-// On Windows the `codex` binary installed by npm is `codex.cmd` (a batch shim).
-// Node's `spawn` does NOT search PATHEXT, so it can't find .cmd files directly —
-// we have to delegate the PATH lookup to cmd.exe via `shell: true`. Mirrors the
-// official @openai/codex plugin's process.mjs.
-const CODEX_SPAWN_OPTS = {
-  shell: process.platform === 'win32' ? (process.env.SHELL || true) : false,
-  windowsHide: true,
-};
+// Cross-platform codex resolver. Returns `{ exec, prefixArgs }` so the caller
+// can `spawn(exec, [...prefixArgs, ...args], { shell: false })`.
+//
+// POSIX: `codex` is a real binary (or a node script with a shebang that the OS
+// resolves), so a direct spawn with shell:false works as-is.
+//
+// Windows: `codex` ships as `codex.cmd`, an npm-bin batch shim. Routing through
+// `shell: true` would expand `%VAR%` even inside double-quoted args (cmd.exe
+// semantics + Node DEP0190). Spawning the .cmd directly with shell:false throws
+// EINVAL on modern Node (CVE-2024-27980 mitigation). So we resolve the shim to
+// its underlying JS entrypoint and spawn `node <codex.js>` directly. Native
+// `.exe`/`.com` installs are detected and spawned directly without `node`.
+let resolvedCodexCache = null;
 
-// With shell:true on Windows, args are concatenated into a single command string
-// without escaping (Node DEP0190). Wrap anything containing whitespace or cmd
-// metachars in double quotes so paths like `C:\My Project\...` survive.
-function escapeCodexArgs(args) {
-  if (process.platform !== 'win32') return args;
-  return args.map((a) => {
-    const s = String(a);
-    if (!/[\s"&|<>^()%!`]/.test(s)) return s;
-    return `"${s.replace(/"/g, '""')}"`;
-  });
+async function resolveCodex() {
+  if (resolvedCodexCache) return resolvedCodexCache;
+
+  if (process.platform !== 'win32') {
+    resolvedCodexCache = { exec: 'codex', prefixArgs: [] };
+    return resolvedCodexCache;
+  }
+
+  // Walk PATH × PATHEXT to find the codex shim. Real Windows default PATHEXT
+  // puts .COM/.EXE before .CMD/.BAT — honor that order so a native install
+  // beats a .cmd shim when both exist.
+  const exts = (process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC')
+    .split(';').map((s) => s.trim()).filter(Boolean);
+  let found = null;
+  outer: for (const dir of (process.env.PATH || '').split(path.delimiter)) {
+    if (!dir) continue;
+    for (const ext of exts) {
+      const candidate = path.join(dir, 'codex' + ext);
+      try {
+        await fs.access(candidate);
+        found = candidate;
+        break outer;
+      } catch { /* keep looking */ }
+    }
+  }
+  if (!found) {
+    throw new CodexNotInstalledError(`'codex' not found on PATH (searched ${exts.join(', ')})`);
+  }
+
+  const ext = path.extname(found).toLowerCase();
+  const cmdDir = path.dirname(found);
+
+  // Native executable: spawn directly with shell:false (no shim needed).
+  if (ext === '.exe' || ext === '.com') {
+    resolvedCodexCache = { exec: found, prefixArgs: [] };
+    return resolvedCodexCache;
+  }
+
+  // .cmd / .bat: npm-bin shim. Resolve the underlying JS entrypoint.
+  // (A) Canonical layout — works for global and local npm installs alike.
+  const canonicalJs = path.join(cmdDir, 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
+  try {
+    await fs.access(canonicalJs);
+    resolvedCodexCache = { exec: process.execPath, prefixArgs: [canonicalJs] };
+    return resolvedCodexCache;
+  } catch { /* fall through to parser */ }
+
+  // (B) Fallback: parse the .cmd for the JS path. The npm-bin shim declares
+  // `SET dp0=%~dp0` and then quotes `"%dp0%\..."`. Expand `%dp0%` ourselves —
+  // otherwise path.resolve produces a path with the literal `%dp0%` token in
+  // it (which doesn't exist on disk).
+  const cmdText = await fs.readFile(found, 'utf8');
+  const m = cmdText.match(/"%[^%"]+%"\s+"([^"]+\.[mc]?js)"\s+%\*/);
+  if (!m) {
+    throw new CodexNotInstalledError(
+      `codex installed at ${found} but couldn't derive JS entrypoint (tried ${canonicalJs} and shim parse)`,
+    );
+  }
+  const expanded = m[1].replace(/%dp0%/gi, cmdDir);
+  const jsResolved = path.resolve(cmdDir, expanded);
+  try {
+    await fs.access(jsResolved);
+  } catch {
+    throw new CodexNotInstalledError(
+      `derived JS entrypoint ${jsResolved} from ${found} does not exist`,
+    );
+  }
+  resolvedCodexCache = { exec: process.execPath, prefixArgs: [jsResolved] };
+  return resolvedCodexCache;
 }
 
 // Codex on Windows fails with "os error 2" when --cd receives a backslash path
@@ -224,10 +288,14 @@ export function validateEffort(value) {
 // Probe that `codex` is on PATH and runnable. Throws CodexNotInstalledError on
 // ENOENT or non-zero exit.
 export async function assertCodexInstalled() {
+  const resolved = await resolveCodex();
   return await new Promise((resolve, reject) => {
     let child;
     try {
-      child = spawn('codex', escapeCodexArgs(['--version']), { stdio: ['ignore', 'pipe', 'pipe'], ...CODEX_SPAWN_OPTS });
+      child = spawn(resolved.exec, [...resolved.prefixArgs, '--version'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
     } catch (err) {
       reject(new CodexNotInstalledError(`failed to spawn 'codex': ${err.message}`));
       return;
@@ -307,6 +375,8 @@ export async function runCodexExec(opts) {
 
   await fs.writeFile(promptPath, promptText, 'utf8');
 
+  const resolved = await resolveCodex();
+
   const args = [];
   args.push('exec');
   if (mode === 'resume') {
@@ -348,7 +418,10 @@ export async function runCodexExec(opts) {
   const result = await new Promise((resolve, reject) => {
     let child;
     try {
-      child = spawn('codex', escapeCodexArgs(args), { stdio: ['pipe', 'pipe', 'pipe'], ...CODEX_SPAWN_OPTS });
+      child = spawn(resolved.exec, [...resolved.prefixArgs, ...args], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
     } catch (err) {
       jsonlStream.end();
       reject(new CodexExecFailedError(`failed to spawn 'codex exec': ${err.message}`));
