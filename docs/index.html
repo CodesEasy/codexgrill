@@ -1,59 +1,198 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#1a1816" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1a1816" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#fdfbf8" media="(prefers-color-scheme: light)" />
 
   <title>codexgrill — Adversarial plan review for Claude Code</title>
-  <meta name="description" content="A Claude Code plugin that grills plans with Codex (read-only) and validates every finding against the real code before applying it." />
+  <meta name="description" content="A Claude Code plugin that grills your implementation plans with Codex (read-only) and validates every finding against the real code before applying it. Two models, one truth. SHA256-contained, one-step rollback." />
+  <meta name="keywords" content="claude code, codex, plugin, plan review, code review, AI pair programming, anthropic, openai, adversarial review, dev tools" />
+  <meta name="author" content="codeseasy" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <meta name="googlebot" content="index, follow" />
   <link rel="canonical" href="https://codexgrill.com/" />
 
-  <!-- OpenGraph / social -->
+  <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://codexgrill.com/" />
+  <meta property="og:site_name" content="codexgrill" />
   <meta property="og:title" content="codexgrill — Adversarial plan review for Claude Code" />
-  <meta property="og:description" content="Codex grills your plan, Claude validates every finding against the real code before applying it." />
+  <meta property="og:description" content="Codex grills your plan, Claude validates every finding against the real code before applying it. Two models, one truth." />
+  <meta property="og:image" content="https://codexgrill.com/assets/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="codexgrill — Adversarial plan review for Claude Code. Read-only by contract, SHA256 containment, one-step rollback." />
+  <meta property="og:locale" content="en_US" />
+
+  <!-- Twitter / X -->
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="codexgrill — Adversarial plan review for Claude Code" />
+  <meta name="twitter:description" content="Codex grills your plan, Claude validates every finding against the real code. Two models, one truth." />
+  <meta name="twitter:image" content="https://codexgrill.com/assets/og-image.png" />
+  <meta name="twitter:image:alt" content="codexgrill — Adversarial plan review for Claude Code" />
+  <meta name="twitter:site" content="@codeseasy" />
 
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='12' fill='%23d97757'/%3E%3C/svg%3E" />
+  <!-- Icons -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23d97757'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h7' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23d97757'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h7' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
 
-  <!-- Bootstrap 5.3 -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <!-- Structured data: SoftwareApplication -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "codexgrill",
+    "alternateName": "codexgrill plugin for Claude Code",
+    "applicationCategory": "DeveloperApplication",
+    "applicationSubCategory": "Code Review",
+    "operatingSystem": "macOS, Linux, Windows",
+    "softwareVersion": "1.0.10",
+    "description": "A Claude Code plugin that grills implementation plans with Codex (read-only) and validates every finding against the real code before applying it.",
+    "url": "https://codexgrill.com/",
+    "downloadUrl": "https://github.com/codeseasy/codexgrill",
+    "license": "https://github.com/codeseasy/codexgrill/blob/main/LICENSE",
+    "image": "https://codexgrill.com/assets/og-image.png",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "codeseasy",
+      "url": "https://github.com/codeseasy"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "codeseasy",
+      "url": "https://github.com/codeseasy"
+    },
+    "softwareRequirements": "Claude Code, Codex CLI v0.130+, Node.js 18+, git 2.23+",
+    "featureList": [
+      "Adversarial plan review using two models",
+      "Read-only by contract with SHA256 working-tree containment",
+      "One-step rollback via permanent git refs",
+      "Per-finding validation (CONFIRMED / REFUTED / UNVERIFIABLE)",
+      "Iterative loop with pinned Codex thread for context reuse"
+    ]
+  }
+  </script>
 
-  <!-- Fonts -->
+  <!-- Structured data: FAQ -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is codexgrill?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "codexgrill is a Claude Code plugin that runs adversarial plan review. Codex provides a second opinion on your plan; Claude validates every finding against the real code before applying it. Each claim is marked CONFIRMED, REFUTED, or UNVERIFIABLE."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How do I install codexgrill?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "From inside Claude Code, run: /plugin marketplace add codeseasy/codexgrill, then /plugin install codexgrill@codexgrill, then /reload-plugins. Prerequisites: Codex CLI v0.130+, Node.js 18+, git 2.23+."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is codexgrill safe to run on my code?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. The wrapper SHA256-hashes the working tree before and after every Codex call; any unexpected change halts the loop. Each iteration also builds a content snapshot pinned under a permanent git ref so you can restore with a single command if anything goes wrong."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What's the difference between /codexgrill:once and /codexgrill:loop?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": ":once does a single review pass — fast sanity check. :loop iterates Codex review + Claude validation + plan edits until both models agree the plan is sound, or --max rounds run out (default 7). The loop pins one Codex thread so context and cache are preserved across iterations."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is codexgrill affiliated with OpenAI or Anthropic?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. codexgrill is a community plugin published under MIT license. It has a runtime dependency on the Codex CLI (installed and authenticated separately) and runs inside Claude Code, but is not affiliated with or endorsed by OpenAI or Anthropic."
+        }
+      }
+    ]
+  }
+  </script>
+
+  <!-- Structured data: WebSite + sitelinks search -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "codexgrill",
+    "url": "https://codexgrill.com/",
+    "description": "Adversarial plan review for Claude Code"
+  }
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="./assets/style.css" />
 </head>
 <body>
 
+<!-- skip link for accessibility / SEO -->
+<a href="#main" class="skip-link">Skip to main content</a>
+
+<!-- scroll-progress bar -->
+<div class="scroll-progress" aria-hidden="true"><span></span></div>
+
 <!-- ============================================================
      NAV
 ============================================================ -->
-<nav class="navbar cg-nav fixed-top">
-  <div class="container">
-    <a class="cg-brand" href="#top">
-      <span class="cg-brand-dot"></span>
-      <span>codexgrill</span>
+<nav class="cg-nav" id="nav">
+  <div class="container nav-row">
+    <a class="cg-brand" href="#top" aria-label="codexgrill home">
+      <span class="cg-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="22" height="22">
+          <rect width="32" height="32" rx="7" fill="currentColor"/>
+          <path d="M9 11h14M9 16h10M9 21h7" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="cg-brand-name">codexgrill</span>
+      <span class="cg-brand-version">v1.0.10</span>
     </a>
-    <ul class="nav d-none d-md-flex">
-      <li class="nav-item"><a class="nav-link" href="#install">Install</a></li>
-      <li class="nav-item"><a class="nav-link" href="#usage">Usage</a></li>
-      <li class="nav-item"><a class="nav-link" href="#how-it-works">How it works</a></li>
-      <li class="nav-item"><a class="nav-link" href="#safety">Safety</a></li>
-      <li class="nav-item"><a class="nav-link" href="#artifacts">Artifacts</a></li>
+
+    <ul class="cg-nav-links" id="nav-links">
+      <li><a href="#install">Install</a></li>
+      <li><a href="#usage">Usage</a></li>
+      <li><a href="#how-it-works">How it works</a></li>
+      <li><a href="#safety">Safety</a></li>
+      <li><a href="#artifacts">Reference</a></li>
     </ul>
-    <div class="d-flex align-items-center gap-2">
-      <a class="btn-cg-ghost d-none d-sm-inline-flex" href="https://github.com/codeseasy/codexgrill" target="_blank" rel="noopener" style="padding: 0.4rem 0.85rem; font-size: 0.9rem;">
-        <i class="bi bi-github"></i><span>GitHub</span>
+
+    <div class="cg-nav-actions">
+      <a class="btn-ghost btn-sm" href="https://github.com/codeseasy/codexgrill" target="_blank" rel="noopener" aria-label="View source on GitHub">
+        <i class="bi bi-github" aria-hidden="true"></i>
+        <span class="hide-sm">GitHub</span>
       </a>
-      <button class="theme-toggle" data-theme-toggle aria-label="Toggle theme">
-        <i class="bi bi-sun-fill"></i>
-        <i class="bi bi-moon-stars-fill"></i>
+      <button class="icon-btn" data-theme-toggle aria-label="Toggle theme">
+        <i class="bi bi-sun-fill icon-sun" aria-hidden="true"></i>
+        <i class="bi bi-moon-stars-fill icon-moon" aria-hidden="true"></i>
+      </button>
+      <button class="icon-btn nav-menu-btn" id="nav-menu-btn" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-links">
+        <i class="bi bi-list icon-open" aria-hidden="true"></i>
+        <i class="bi bi-x-lg icon-close" aria-hidden="true"></i>
       </button>
     </div>
   </div>
@@ -62,60 +201,96 @@
 <!-- ============================================================
      HERO
 ============================================================ -->
-<header id="top" class="hero">
-  <div class="container position-relative">
-    <span class="hero-badge">
-      <span class="dot"></span>
-      <span>v1.0.10 &nbsp;·&nbsp; Community plugin for Claude Code</span>
-    </span>
-    <h1 class="hero-title">
-      Adversarial plan review<br />for <span class="accent">Claude Code</span>
-    </h1>
-    <p class="hero-sub">
-      Codex grills your plan, finds the holes — wrong assumptions, missing files, ordering risks, security gaps.
-      Claude validates every finding against the real code before touching the plan.
-    </p>
-    <div class="hero-cta">
-      <a class="btn-cg-primary" href="#install">
-        <i class="bi bi-download"></i><span>Install in 30 seconds</span>
-      </a>
-      <a class="btn-cg-ghost" href="#how-it-works">
-        <i class="bi bi-arrow-right"></i><span>How it works</span>
-      </a>
-      <a class="btn-cg-ghost" href="https://github.com/codeseasy/codexgrill" target="_blank" rel="noopener">
-        <i class="bi bi-github"></i><span>Source</span>
-      </a>
+<main id="main">
+<header id="top" class="hero" aria-labelledby="hero-title">
+  <div class="hero-bg" aria-hidden="true">
+    <div class="hero-glow"></div>
+    <div class="hero-grid"></div>
+  </div>
+
+  <div class="container">
+    <div class="hero-grid-layout">
+      <div class="hero-text">
+        <span class="hero-badge">
+          <span class="dot" aria-hidden="true"></span>
+          <span>v1.0.10 · plugin for Claude Code</span>
+        </span>
+        <h1 class="hero-title" id="hero-title">
+          Adversarial plan&nbsp;review
+          <span class="accent-line">for <span class="accent">Claude&nbsp;Code</span></span>
+        </h1>
+        <p class="hero-sub">
+          Codex grills your plan — wrong assumptions, missing files, ordering risks, security gaps.
+          Claude validates every finding against the real code before touching the plan.
+        </p>
+        <div class="hero-cta">
+          <a class="btn-primary" href="#install">
+            <i class="bi bi-download" aria-hidden="true"></i>
+            <span>Install in 30 seconds</span>
+          </a>
+          <a class="btn-ghost" href="#how-it-works">
+            <span>How it works</span>
+            <i class="bi bi-arrow-right" aria-hidden="true"></i>
+          </a>
+        </div>
+
+        <ul class="hero-checks">
+          <li><i class="bi bi-check2" aria-hidden="true"></i>Read-only, SHA256-contained</li>
+          <li><i class="bi bi-check2" aria-hidden="true"></i>One-step rollback</li>
+          <li><i class="bi bi-check2" aria-hidden="true"></i>No memory shortcuts</li>
+        </ul>
+      </div>
+
+      <!-- terminal demo -->
+      <div class="hero-terminal" aria-hidden="true">
+        <div class="term">
+          <div class="term-bar">
+            <span class="term-dots"><i></i><i></i><i></i></span>
+            <span class="term-title">claude code · plan review</span>
+            <span class="term-meta">iter 2/7</span>
+          </div>
+          <div class="term-body" id="term-body">
+            <div class="term-line"><span class="term-prompt">›</span> <span class="term-cmd">/codexgrill:loop</span></div>
+            <div class="term-line term-out">↻ pinning thread <span class="term-dim">019…b21</span></div>
+            <div class="term-line term-out term-tag-codex">CODEX  <span class="term-dim">·</span> reviewing plan…</div>
+            <div class="term-line term-out term-indent"><span class="term-warn">NEEDS REVISION</span></div>
+            <div class="term-line term-out term-indent"><span class="term-bullet">•</span> HIGH <span class="term-dim">·</span> auth.ts:42 — race in token refresh</div>
+            <div class="term-line term-out term-indent"><span class="term-bullet">•</span> MED&nbsp; <span class="term-dim">·</span> missing rollback on retry</div>
+            <div class="term-line term-out term-tag-claude">CLAUDE <span class="term-dim">·</span> validating findings…</div>
+            <div class="term-line term-out term-indent"><span class="term-ok">CONFIRMED</span> auth.ts:42 — refresh isn't mutex-guarded</div>
+            <div class="term-line term-out term-indent"><span class="term-bad">REFUTED</span>&nbsp;&nbsp; queue.ts:88 — already idempotent</div>
+            <div class="term-line term-out">✎ revising plan · <span class="term-dim">applied 3, dropped 1</span></div>
+            <div class="term-line term-out term-tag-codex">CODEX  <span class="term-dim">·</span> re-review</div>
+            <div class="term-line term-out term-indent"><span class="term-ok">SOUND</span> — no remaining findings</div>
+            <div class="term-line"><span class="term-prompt">›</span> <span class="term-caret">▍</span></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </header>
 
 <!-- ============================================================
-     FEATURES (3-card)
+     FEATURES
 ============================================================ -->
-<section id="features">
+<section id="features" class="section section-features" aria-label="Key features">
   <div class="container">
-    <div class="row g-4">
-      <div class="col-md-4">
-        <div class="cg-card">
-          <span class="icon-wrap"><i class="bi bi-shield-shaded"></i></span>
-          <h3>Two models, one truth</h3>
-          <p>Codex provides the second opinion. Claude reads the cited file before agreeing — every claim is CONFIRMED, REFUTED, or UNVERIFIABLE. No memory shortcuts.</p>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="cg-card">
-          <span class="icon-wrap"><i class="bi bi-eye-slash"></i></span>
-          <h3>Read-only by contract</h3>
-          <p>The wrapper SHA256-hashes the working tree before and after every Codex call. Any unexpected change halts the loop. Nothing slips through.</p>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="cg-card">
-          <span class="icon-wrap"><i class="bi bi-arrow-counterclockwise"></i></span>
-          <h3>One-step rollback</h3>
-          <p>Each iter builds a content snapshot of your working tree under a permanent git ref. If anything goes sideways, restore with a single documented command.</p>
-        </div>
-      </div>
+    <div class="feature-grid">
+      <article class="feature-card">
+        <span class="icon-pill"><i class="bi bi-shield-shaded" aria-hidden="true"></i></span>
+        <h3>Two models, one truth</h3>
+        <p>Codex provides the second opinion. Claude reads the cited file before agreeing — every claim is <em>CONFIRMED</em>, <em>REFUTED</em>, or <em>UNVERIFIABLE</em>. No memory shortcuts.</p>
+      </article>
+      <article class="feature-card">
+        <span class="icon-pill"><i class="bi bi-eye-slash" aria-hidden="true"></i></span>
+        <h3>Read-only by contract</h3>
+        <p>The wrapper SHA256-hashes the working tree before and after every Codex call. Any unexpected change halts the loop. Nothing slips through.</p>
+      </article>
+      <article class="feature-card">
+        <span class="icon-pill"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i></span>
+        <h3>One-step rollback</h3>
+        <p>Each iter builds a content snapshot of your working tree under a permanent git ref. If anything goes sideways, restore with a single documented command.</p>
+      </article>
     </div>
   </div>
 </section>
@@ -123,121 +298,146 @@
 <!-- ============================================================
      INSTALL
 ============================================================ -->
-<section id="install">
+<section id="install" class="section" aria-labelledby="install-title">
   <div class="container">
-    <div class="section-eyebrow">01 · Setup</div>
-    <h2 class="section-title"><a class="section-anchor" href="#install">Install</a></h2>
-    <p class="section-lead">Two CLI prerequisites, then three Claude Code commands. No project-level config.</p>
-
-    <h3 style="font-size: 1.05rem; margin-top: 2rem;">Prerequisites</h3>
-    <ul style="color: var(--bs-secondary-color); line-height: 2;">
-      <li><a href="https://github.com/openai/codex" target="_blank" rel="noopener" style="color: var(--cg-orange);">Codex CLI</a> v0.130+ — <code>npm install -g @openai/codex</code>, then <code>codex login</code>.</li>
-      <li><strong>Node.js 18+</strong></li>
-      <li><strong>git 2.23+</strong> &nbsp; <span style="color: var(--bs-tertiary-color);">(must run inside a working tree; <code>git restore --source</code> is used for rollback)</span></li>
-    </ul>
-
-    <h3 style="font-size: 1.05rem; margin-top: 2rem;">Add the plugin</h3>
-    <p style="color: var(--bs-secondary-color);">From inside Claude Code:</p>
-    <div class="code-block">
-      <div class="code-block-header">
-        <span>claude code</span>
-        <button class="copy-btn"><i class="bi bi-clipboard"></i><span class="copy-label">Copy</span></button>
-      </div>
-<pre><code>/plugin marketplace add codeseasy/codexgrill
-/plugin install codexgrill@codexgrill
-/reload-plugins</code></pre>
+    <div class="section-head">
+      <span class="section-eyebrow">01 · Setup</span>
+      <h2 class="section-title" id="install-title"><a class="section-anchor" href="#install">Install</a></h2>
+      <p class="section-lead">Two CLI prerequisites, then three Claude Code commands. No project-level config.</p>
     </div>
-    <p style="color: var(--bs-secondary-color); font-size: 0.92rem;">
-      That's it. Two slash commands are now available: <code>/codexgrill:once</code> and <code>/codexgrill:loop</code>.
-    </p>
+
+    <div class="install-grid">
+      <div>
+        <h3 class="h-sub">Prerequisites</h3>
+        <ul class="check-list">
+          <li>
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <div>
+              <a href="https://github.com/openai/codex" target="_blank" rel="noopener">Codex CLI</a> v0.130+
+              <span class="dim"><code>npm install -g @openai/codex</code>, then <code>codex login</code></span>
+            </div>
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <div>Node.js 18+</div>
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+            <div>
+              git 2.23+
+              <span class="dim">must run inside a working tree — <code>git restore --source</code> is used for rollback</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="h-sub">Add the plugin</h3>
+        <p class="dim small">From inside Claude Code:</p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="lang">claude code</span>
+            <button class="copy-btn" type="button"><i class="bi bi-clipboard" aria-hidden="true"></i><span class="copy-label">Copy</span></button>
+          </div>
+<pre><code><span class="cmt"># 1. point Claude at the marketplace</span>
+/plugin marketplace add codeseasy/codexgrill
+<span class="cmt"># 2. install</span>
+/plugin install codexgrill@codexgrill
+<span class="cmt"># 3. reload to register the commands</span>
+/reload-plugins</code></pre>
+        </div>
+        <p class="dim small">
+          That's it. Two slash commands are now available: <code>/codexgrill:once</code> and <code>/codexgrill:loop</code>.
+        </p>
+      </div>
+    </div>
   </div>
 </section>
 
 <!-- ============================================================
      USAGE
 ============================================================ -->
-<section id="usage">
+<section id="usage" class="section section-alt" aria-labelledby="usage-title">
   <div class="container">
-    <div class="section-eyebrow">02 · Daily use</div>
-    <h2 class="section-title"><a class="section-anchor" href="#usage">Usage</a></h2>
-    <p class="section-lead">
-      The plan path is <strong>optional</strong> in both commands — pass nothing and codexgrill grills the plan
-      from this session's <code>ExitPlanMode</code> automatically.
-    </p>
+    <div class="section-head">
+      <span class="section-eyebrow">02 · Daily use</span>
+      <h2 class="section-title" id="usage-title"><a class="section-anchor" href="#usage">Usage</a></h2>
+      <p class="section-lead">
+        The plan path is <strong>optional</strong> in both commands — pass nothing and codexgrill grills the plan
+        from this session's <code>ExitPlanMode</code> automatically.
+      </p>
+    </div>
 
-    <div data-tabs="commands" class="cg-tabs">
-      <button class="cg-tab-btn active" data-tab-target="once">/codexgrill:once</button>
-      <button class="cg-tab-btn" data-tab-target="loop">/codexgrill:loop</button>
+    <div class="cg-tabs" data-tabs="commands" role="tablist">
+      <button class="cg-tab-btn active" data-tab-target="once" role="tab" aria-selected="true">/codexgrill:once</button>
+      <button class="cg-tab-btn" data-tab-target="loop" role="tab" aria-selected="false">/codexgrill:loop</button>
     </div>
 
     <div data-tabs-panel-group="commands">
-      <div class="cg-tab-panel active" data-tabs-panel="once">
-        <p style="color: var(--bs-secondary-color);">
+      <div class="cg-tab-panel active" data-tabs-panel="once" role="tabpanel">
+        <p class="muted">
           <strong>One pass.</strong> Codex reviews the plan once. Claude validates every finding against real code.
           The plan is updated and re-presented via <code>ExitPlanMode</code>.
         </p>
         <div class="code-block">
           <div class="code-block-header">
-            <span>claude code</span>
-            <button class="copy-btn"><i class="bi bi-clipboard"></i><span class="copy-label">Copy</span></button>
+            <span class="lang">claude code</span>
+            <button class="copy-btn" type="button"><i class="bi bi-clipboard" aria-hidden="true"></i><span class="copy-label">Copy</span></button>
           </div>
-<pre><code>/codexgrill:once                            # grills this session's plan
-/codexgrill:once path/to/plan.md            # grills the given file
-/codexgrill:once --effort=medium            # override reasoning effort
-/codexgrill:once --model=gpt-5.1-codex      # override model</code></pre>
+<pre><code>/codexgrill:once                            <span class="cmt"># grills this session's plan</span>
+/codexgrill:once path/to/plan.md            <span class="cmt"># grills the given file</span>
+/codexgrill:once --effort=xhigh             <span class="cmt"># override reasoning effort</span>
+/codexgrill:once --model=gpt-5.1-codex      <span class="cmt"># override model</span></code></pre>
         </div>
-        <p style="color: var(--bs-secondary-color); font-size: 0.92rem;">
+        <p class="dim small">
           Best for fast sanity checks before implementation. One round-trip with Codex, full plan inlined.
         </p>
       </div>
 
-      <div class="cg-tab-panel" data-tabs-panel="loop">
-        <p style="color: var(--bs-secondary-color);">
+      <div class="cg-tab-panel" data-tabs-panel="loop" role="tabpanel">
+        <p class="muted">
           <strong>Iterate until clean.</strong> Loops Codex review + Claude validation + plan edits until both models agree
           the plan is sound, or <code>--max</code> rounds run out.
         </p>
         <div class="code-block">
           <div class="code-block-header">
-            <span>claude code</span>
-            <button class="copy-btn"><i class="bi bi-clipboard"></i><span class="copy-label">Copy</span></button>
+            <span class="lang">claude code</span>
+            <button class="copy-btn" type="button"><i class="bi bi-clipboard" aria-hidden="true"></i><span class="copy-label">Copy</span></button>
           </div>
-<pre><code>/codexgrill:loop                            # grills this session's plan
-/codexgrill:loop path/to/plan.md            # grills the given file
-/codexgrill:loop --max=10                   # bump the cap (default 7)
-/codexgrill:loop --effort=medium            # override reasoning effort</code></pre>
+<pre><code>/codexgrill:loop                            <span class="cmt"># grills this session's plan</span>
+/codexgrill:loop path/to/plan.md            <span class="cmt"># grills the given file</span>
+/codexgrill:loop --max=10                   <span class="cmt"># bump the cap (default 7)</span>
+/codexgrill:loop --effort=xhigh             <span class="cmt"># override reasoning effort</span>
+/codexgrill:loop --model=gpt-5.1-codex      <span class="cmt"># override model</span></code></pre>
         </div>
-        <p style="color: var(--bs-secondary-color); font-size: 0.92rem;">
+        <p class="dim small">
           Pins Codex to one thread (so context + cache are preserved across iters) and sends a
           <strong>unified diff</strong> of plan changes after iter 1 — keeping each later turn small enough for large plans.
         </p>
       </div>
     </div>
 
-    <h3 style="margin-top: 2.5rem;">What you'll see in chat</h3>
-    <div class="row g-3 mt-1">
-      <div class="col-md-6">
-        <div class="cg-card" style="padding: 1.2rem;">
-          <strong>Codex's verdict + findings</strong>
-          <p style="margin-top: 0.4rem;">Verbatim. First-line verdict (SOUND / NEEDS REVISION / FUNDAMENTAL ISSUES), then bulleted findings with severity + <code>path:line</code> citations.</p>
-        </div>
+    <h3 class="h-sub mt-xl">What you'll see in chat</h3>
+    <div class="see-grid">
+      <div class="see-card">
+        <span class="see-num">01</span>
+        <strong>Codex's verdict + findings</strong>
+        <p>Verbatim. First-line verdict (<em>SOUND</em> / <em>NEEDS REVISION</em> / <em>FUNDAMENTAL ISSUES</em>), then bulleted findings with severity + <code>path:line</code> citations.</p>
       </div>
-      <div class="col-md-6">
-        <div class="cg-card" style="padding: 1.2rem;">
-          <strong>Claude's per-finding validation</strong>
-          <p style="margin-top: 0.4rem;">Each finding gets CONFIRMED / REFUTED / UNVERIFIABLE with the exact <code>path:line</code> Claude just read. No memory shortcuts.</p>
-        </div>
+      <div class="see-card">
+        <span class="see-num">02</span>
+        <strong>Claude's per-finding validation</strong>
+        <p>Each finding gets <em>CONFIRMED</em> / <em>REFUTED</em> / <em>UNVERIFIABLE</em> with the exact <code>path:line</code> Claude just read. No memory shortcuts.</p>
       </div>
-      <div class="col-md-6">
-        <div class="cg-card" style="padding: 1.2rem;">
-          <strong>"What Codex missed"</strong>
-          <p style="margin-top: 0.4rem;">An independent fresh-eyes pass from Claude — catches issues Codex didn't flag.</p>
-        </div>
+      <div class="see-card">
+        <span class="see-num">03</span>
+        <strong>"What Codex missed"</strong>
+        <p>An independent fresh-eyes pass from Claude — catches issues Codex didn't flag.</p>
       </div>
-      <div class="col-md-6">
-        <div class="cg-card" style="padding: 1.2rem;">
-          <strong>Net verdict + revised plan</strong>
-          <p style="margin-top: 0.4rem;">If revisions were needed, the updated plan is shown and re-presented via <code>ExitPlanMode</code>. Otherwise the original goes through.</p>
-        </div>
+      <div class="see-card">
+        <span class="see-num">04</span>
+        <strong>Net verdict + revised plan</strong>
+        <p>If revisions were needed, the updated plan is shown and re-presented via <code>ExitPlanMode</code>. Otherwise the original goes through.</p>
       </div>
     </div>
   </div>
@@ -246,105 +446,111 @@
 <!-- ============================================================
      HOW IT WORKS
 ============================================================ -->
-<section id="how-it-works">
+<section id="how-it-works" class="section" aria-labelledby="hiw-title">
   <div class="container">
-    <div class="section-eyebrow">03 · Under the hood</div>
-    <h2 class="section-title"><a class="section-anchor" href="#how-it-works">How it works</a></h2>
-    <p class="section-lead">
-      Two models, working against each other. Codex tries to find faults; Claude validates each one against the actual code.
-      Disagreements are resolved by reading the file, not by debate.
-    </p>
-
-    <div class="flow mt-4">
-      <div class="flow-step">
-        <span class="step-num">1</span>
-        <h4>Codex reads your plan</h4>
-        <p>The wrapper sends the plan to <code>codex exec</code> with a strict review prompt. Codex returns findings — wrong assumptions, missing files, ordering risks, security and perf concerns, stale facts.</p>
-      </div>
-      <div class="flow-step">
-        <span class="step-num">2</span>
-        <h4>Claude validates each finding</h4>
-        <p>For every finding, Claude invokes <code>Read</code> on the cited file. Every claim is marked CONFIRMED, REFUTED, or UNVERIFIABLE — never accepted from memory. Cross-file claims dispatch parallel <code>Agent</code> calls; external claims use <code>WebSearch</code>/<code>WebFetch</code> against primary sources.</p>
-      </div>
-      <div class="flow-step">
-        <span class="step-num">3</span>
-        <h4>The plan is edited</h4>
-        <p>CONFIRMED findings are applied (Claude's chosen action may differ from Codex's fix). REFUTED ones are dropped. UNVERIFIABLE items are flagged to you in chat.</p>
-      </div>
-      <div class="flow-step">
-        <span class="step-num">4</span>
-        <h4><code>:loop</code> — repeat with a pinned thread</h4>
-        <p>iter 1 captures the <code>thread_id</code> from Codex's JSONL stream. Every later iter passes that UUID to <code>codex exec resume &lt;id&gt;</code> to preserve conversation context and prompt-cache savings. Resume iters send only a <strong>unified diff</strong> of plan changes plus the path to the current plan file — Codex pulls full context on demand.</p>
-        <p style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--bs-tertiary-color);">
-          Falls back transparently to inlining the full plan if the prior snapshot is missing, the diff is empty (no edits this iter), or the diff would be pathologically large (&gt;80% of plan body).
-        </p>
-      </div>
-      <div class="flow-step">
-        <span class="step-num">5</span>
-        <h4>Re-present via ExitPlanMode</h4>
-        <p>Loop exits when Codex says SOUND and Claude has no remaining findings. The revised plan goes back into plan mode, ready to implement.</p>
-      </div>
+    <div class="section-head">
+      <span class="section-eyebrow">03 · Under the hood</span>
+      <h2 class="section-title" id="hiw-title"><a class="section-anchor" href="#how-it-works">How it works</a></h2>
+      <p class="section-lead">
+        Two models, working against each other. Codex tries to find faults; Claude validates each one against the actual code.
+        Disagreements are resolved by reading the file, not by debate.
+      </p>
     </div>
+
+    <ol class="flow">
+      <li class="flow-step">
+        <span class="step-num">1</span>
+        <div class="step-body">
+          <h4>Codex reads your plan</h4>
+          <p>The wrapper sends the plan to <code>codex exec</code> with a strict review prompt. Codex returns findings — wrong assumptions, missing files, ordering risks, security and perf concerns, stale facts.</p>
+        </div>
+      </li>
+      <li class="flow-step">
+        <span class="step-num">2</span>
+        <div class="step-body">
+          <h4>Claude validates each finding</h4>
+          <p>For every finding, Claude invokes <code>Read</code> on the cited file. Every claim is marked <em>CONFIRMED</em>, <em>REFUTED</em>, or <em>UNVERIFIABLE</em> — never accepted from memory. Cross-file claims dispatch parallel <code>Agent</code> calls; external claims use <code>WebSearch</code>/<code>WebFetch</code> against primary sources.</p>
+        </div>
+      </li>
+      <li class="flow-step">
+        <span class="step-num">3</span>
+        <div class="step-body">
+          <h4>The plan is edited</h4>
+          <p>CONFIRMED findings are applied (Claude's chosen action may differ from Codex's fix). REFUTED ones are dropped. UNVERIFIABLE items are flagged to you in chat.</p>
+        </div>
+      </li>
+      <li class="flow-step">
+        <span class="step-num">4</span>
+        <div class="step-body">
+          <h4><code>:loop</code> — repeat with a pinned thread</h4>
+          <p>iter 1 captures the <code>thread_id</code> from Codex's JSONL stream. Every later iter passes that UUID to <code>codex exec resume &lt;id&gt;</code> to preserve conversation context and prompt-cache savings. Resume iters send only a <strong>unified diff</strong> of plan changes plus the path to the current plan file — Codex pulls full context on demand.</p>
+          <p class="footnote">
+            Falls back transparently to inlining the full plan if the prior snapshot is missing, the diff is empty (no edits this iter), or the diff would be pathologically large (&gt;80% of plan body).
+          </p>
+        </div>
+      </li>
+      <li class="flow-step">
+        <span class="step-num">5</span>
+        <div class="step-body">
+          <h4>Re-present via ExitPlanMode</h4>
+          <p>Loop exits when Codex says SOUND and Claude has no remaining findings. The revised plan goes back into plan mode, ready to implement.</p>
+        </div>
+      </li>
+    </ol>
   </div>
 </section>
 
 <!-- ============================================================
-     SAFETY — containment + revert
+     SAFETY
 ============================================================ -->
-<section id="safety">
+<section id="safety" class="section section-alt" aria-labelledby="safety-title">
   <div class="container">
-    <div class="section-eyebrow">04 · Safety contract</div>
-    <h2 class="section-title"><a class="section-anchor" href="#safety">Containment &amp; revert</a></h2>
-    <p class="section-lead">
-      Codex runs with <code>--dangerously-bypass-approvals-and-sandbox</code> because the read-only sandbox blocks
-      legitimate read commands (<code>git log</code>, <code>grep</code>, etc) and breaks any serious review.
-      Two mechanisms enforce read-only behaviour anyway.
-    </p>
+    <div class="section-head">
+      <span class="section-eyebrow">04 · Safety contract</span>
+      <h2 class="section-title" id="safety-title"><a class="section-anchor" href="#safety">Containment &amp; revert</a></h2>
+      <p class="section-lead">
+        Codex runs with <code>--dangerously-bypass-approvals-and-sandbox</code> because the read-only sandbox blocks
+        legitimate read commands (<code>git log</code>, <code>grep</code>, etc.) and breaks any serious review.
+        Two mechanisms enforce read-only behaviour anyway.
+      </p>
+    </div>
 
-    <div class="row g-4 mt-2">
-      <div class="col-md-6">
-        <div class="cg-card">
-          <span class="icon-wrap"><i class="bi bi-fingerprint"></i></span>
-          <h3>1. SHA256 working-tree containment</h3>
-          <p>The wrapper hashes every Git-visible dirty + untracked path in the working tree before and after every Codex call. Any change → exit <code>2</code> (<code>WORKING_TREE_CHANGED</code>), loop halts, you decide what happened.</p>
-        </div>
+    <div class="safety-grid">
+      <div class="feature-card">
+        <span class="icon-pill"><i class="bi bi-fingerprint" aria-hidden="true"></i></span>
+        <h3>1. SHA256 working-tree containment</h3>
+        <p>The wrapper hashes every Git-visible dirty + untracked path in the working tree before and after every Codex call. Any change → exit <code>2</code> (<code>WORKING_TREE_CHANGED</code>), loop halts, you decide what happened.</p>
       </div>
-      <div class="col-md-6">
-        <div class="cg-card">
-          <span class="icon-wrap"><i class="bi bi-file-lock"></i></span>
-          <h3>2. Prompt-level read-only contract</h3>
-          <p>The review prompt's <code>&lt;action_safety&gt;</code> block explicitly tells Codex that any modification will cause the entire run to be REJECTED and the output discarded.</p>
-        </div>
+      <div class="feature-card">
+        <span class="icon-pill"><i class="bi bi-file-lock" aria-hidden="true"></i></span>
+        <h3>2. Prompt-level read-only contract</h3>
+        <p>The review prompt's <code>&lt;action_safety&gt;</code> block explicitly tells Codex that any modification will cause the entire run to be REJECTED and the output discarded.</p>
       </div>
     </div>
 
-    <h3 style="margin-top: 3rem;">Scope — what gets checked</h3>
-    <p style="color: var(--bs-secondary-color);">
-      The containment hash covers <strong>everything except</strong>:
-    </p>
-    <ul style="color: var(--bs-secondary-color); line-height: 2;">
-      <li>Paths matching <code>.gitignore</code> — standard git behaviour (<code>git status</code> and <code>git add -A</code> both skip them).</li>
-      <li>The wrapper's own <code>$RUN_DIR</code> artifacts (it's writing those during the run).</li>
-      <li>A default list of IDE/OS auto-mutating paths: <code>.idea/**</code>, <code>.vs/**</code>, <code>.vscode/**</code>, <code>*.swp</code>, <code>.DS_Store</code>, etc.</li>
+    <h3 class="h-sub mt-xl">Scope — what gets checked</h3>
+    <p class="muted">The containment hash covers <strong>everything except</strong>:</p>
+    <ul class="check-list compact">
+      <li><i class="bi bi-dash-lg" aria-hidden="true"></i><div>Paths matching <code>.gitignore</code> — standard git behaviour (<code>git status</code> and <code>git add -A</code> both skip them).</div></li>
+      <li><i class="bi bi-dash-lg" aria-hidden="true"></i><div>The wrapper's own <code>$RUN_DIR</code> artifacts (it's writing those during the run).</div></li>
+      <li><i class="bi bi-dash-lg" aria-hidden="true"></i><div>A default list of IDE/OS auto-mutating paths: <code>.idea/**</code>, <code>.vs/**</code>, <code>.vscode/**</code>, <code>*.swp</code>, <code>.DS_Store</code>, etc.</div></li>
     </ul>
-    <p style="color: var(--bs-secondary-color); font-size: 0.92rem;">
+    <p class="dim small">
       The full list lives in <code>DEFAULT_IGNORED_PATTERNS</code> at <code>scripts/lib/codex-exec.mjs</code>.
     </p>
 
-    <h3 style="margin-top: 3rem;">Revert safety net</h3>
-    <p style="color: var(--bs-secondary-color);">
+    <h3 class="h-sub mt-xl">Revert safety net</h3>
+    <p class="muted">
       Before each iteration the wrapper builds a content snapshot of the working tree — a single git commit holding
       the union of tracked + untracked content, pinned under a permanent ref like
       <code>refs/codexgrill/&lt;run-id&gt;/iter-&lt;N&gt;-pre</code>. Built via a <strong>temporary index</strong>
       (<code>GIT_INDEX_FILE</code>), so your real index, working tree, and stash list are untouched.
     </p>
-    <p style="color: var(--bs-secondary-color);">
-      If something looks wrong, revert with two commands:
-    </p>
+    <p class="muted">If something looks wrong, revert with two commands:</p>
     <div class="code-block">
       <div class="code-block-header">
-        <span>bash</span>
-        <button class="copy-btn"><i class="bi bi-clipboard"></i><span class="copy-label">Copy</span></button>
+        <span class="lang">bash</span>
+        <button class="copy-btn" type="button"><i class="bi bi-clipboard" aria-hidden="true"></i><span class="copy-label">Copy</span></button>
       </div>
 <pre><code>git restore --source=&lt;preIterStash.hash&gt; --staged --worktree -- :/
 git clean -fd</code></pre>
@@ -354,7 +560,7 @@ git clean -fd</code></pre>
       <p>Originally-untracked files re-appear as <em>staged additions</em> after restore — every file's bytes match the pre-run state, but <code>git status</code> will look slightly different. We chose content fidelity over staging-state fidelity; this matches 95% of "Codex broke something, get the bytes back" use.</p>
     </div>
 
-    <p style="color: var(--bs-secondary-color); font-size: 0.92rem; margin-top: 1.5rem;">
+    <p class="dim small mt-l">
       Manage snapshots: list with <code>git for-each-ref refs/codexgrill/</code>; remove with
       <code>git update-ref -d &lt;ref&gt;</code>.
     </p>
@@ -364,39 +570,45 @@ git clean -fd</code></pre>
 <!-- ============================================================
      ARTIFACTS
 ============================================================ -->
-<section id="artifacts">
+<section id="artifacts" class="section">
   <div class="container">
-    <div class="section-eyebrow">05 · Reference</div>
-    <h2 class="section-title"><a class="section-anchor" href="#artifacts">Run artifacts</a></h2>
-    <p class="section-lead">
-      Every run drops artifacts under <code>.claude/temp/codexgrill/&lt;run-id&gt;/</code> (gitignored).
-      Useful for debugging, audit trails, and replaying what Codex saw.
-    </p>
+    <div class="section-head">
+      <span class="section-eyebrow">05 · Reference</span>
+      <h2 class="section-title"><a class="section-anchor" href="#artifacts">Run artifacts</a></h2>
+      <p class="section-lead">
+        Every run drops artifacts under <code>.claude/temp/codexgrill/&lt;run-id&gt;/</code> (gitignored).
+        Useful for debugging, audit trails, and replaying what Codex saw.
+      </p>
+    </div>
 
-    <h3 style="margin-top: 1.5rem;"><code>:once</code> runs</h3>
-    <table class="cg-table">
-      <thead><tr><th>file</th><th>description</th></tr></thead>
-      <tbody>
-        <tr><td><code>prompt.txt</code></td><td>Exact prompt sent to Codex.</td></tr>
-        <tr><td><code>final.txt</code></td><td>Codex's final review message.</td></tr>
-        <tr><td><code>codex.jsonl</code></td><td>Full JSONL event stream from <code>codex exec</code> (every tool call, every reasoning step).</td></tr>
-        <tr><td><code>result.json</code></td><td>Wrapper summary — thread_id, exit_code, token usage, paths, preIterStash hash.</td></tr>
-      </tbody>
-    </table>
+    <h3 class="h-sub"><code>:once</code> runs</h3>
+    <div class="table-wrap">
+      <table class="cg-table">
+        <thead><tr><th>file</th><th>description</th></tr></thead>
+        <tbody>
+          <tr><td><code>prompt.txt</code></td><td>Exact prompt sent to Codex.</td></tr>
+          <tr><td><code>final.txt</code></td><td>Codex's final review message.</td></tr>
+          <tr><td><code>codex.jsonl</code></td><td>Full JSONL event stream from <code>codex exec</code> (every tool call, every reasoning step).</td></tr>
+          <tr><td><code>result.json</code></td><td>Wrapper summary — thread_id, exit_code, token usage, paths, preIterStash hash.</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-    <h3 style="margin-top: 2rem;"><code>:loop</code> runs</h3>
-    <p style="color: var(--bs-secondary-color);">Each artifact above gets an <code>-iter&lt;N&gt;</code> suffix, plus:</p>
-    <table class="cg-table">
-      <thead><tr><th>file</th><th>description</th></tr></thead>
-      <tbody>
-        <tr><td><code>state.json</code></td><td>Run state — pinned <code>codex_thread_id</code>, per-iter verdicts, validation counts.</td></tr>
-        <tr><td><code>refuted-log.txt</code></td><td>Cumulative refutations, prepended to each iteration's prompt so prior REFUTED findings aren't re-raised without new evidence.</td></tr>
-        <tr><td><code>plan-snapshot-iter&lt;N&gt;.md</code></td><td>Verbatim copy of the plan body sent to Codex in iter N. Used as the baseline for iter N+1's diff.</td></tr>
-        <tr><td><code>plan-diff-iter&lt;N&gt;.diff</code></td><td>Unified diff of plan changes vs the prior iter's snapshot.</td></tr>
-      </tbody>
-    </table>
+    <h3 class="h-sub mt-xl"><code>:loop</code> runs</h3>
+    <p class="muted">Each artifact above gets an <code>-iter&lt;N&gt;</code> suffix, plus:</p>
+    <div class="table-wrap">
+      <table class="cg-table">
+        <thead><tr><th>file</th><th>description</th></tr></thead>
+        <tbody>
+          <tr><td><code>state.json</code></td><td>Run state — pinned <code>codex_thread_id</code>, per-iter verdicts, validation counts.</td></tr>
+          <tr><td><code>refuted-log.txt</code></td><td>Cumulative refutations, prepended to each iteration's prompt so prior REFUTED findings aren't re-raised without new evidence.</td></tr>
+          <tr><td><code>plan-snapshot-iter&lt;N&gt;.md</code></td><td>Verbatim copy of the plan body sent to Codex in iter N. Used as the baseline for iter N+1's diff.</td></tr>
+          <tr><td><code>plan-diff-iter&lt;N&gt;.diff</code></td><td>Unified diff of plan changes vs the prior iter's snapshot.</td></tr>
+        </tbody>
+      </table>
+    </div>
 
-    <p style="color: var(--bs-secondary-color); font-size: 0.92rem; margin-top: 1.5rem;">
+    <p class="dim small mt-l">
       Each <code>result-iter&lt;N&gt;.json</code> also records <code>resumePromptMode</code>
       (<code>"diff"</code> / <code>"full-plan-fallback"</code> / <code>"no-change"</code> / <code>null</code>),
       <code>planSnapshotPath</code>, <code>planDiffPath</code>, and <code>planDiffStats</code>
@@ -408,19 +620,23 @@ git clean -fd</code></pre>
 <!-- ============================================================
      TUNING
 ============================================================ -->
-<section id="tuning">
+<section id="tuning" class="section section-alt">
   <div class="container">
-    <div class="section-eyebrow">06 · Reference</div>
-    <h2 class="section-title"><a class="section-anchor" href="#tuning">Tuning for large plans</a></h2>
-    <p class="section-lead">
-      <code>codex exec</code> has no auto-compaction — a single review turn that overruns the per-turn context window
-      aborts with an error instead of retrying. If you see &quot;Codex ran out of room in the model's context window&quot;:
-    </p>
-    <ul style="color: var(--bs-secondary-color); line-height: 2;">
-      <li>The most common cause is <code>model_reasoning_effort = "xhigh"</code> in <code>~/.codex/config.toml</code>. Reasoning tokens count toward the per-turn budget.</li>
-      <li>Pass <code>--effort=medium</code> to override the config for this run only. Valid levels: <code>none</code>, <code>minimal</code>, <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>.</li>
-      <li>Or trim the plan body and re-run.</li>
+    <div class="section-head">
+      <span class="section-eyebrow">06 · Reference</span>
+      <h2 class="section-title"><a class="section-anchor" href="#tuning">Tuning for large plans</a></h2>
+      <p class="section-lead">
+        <code>codex exec</code> has no auto-compaction — a single review turn that overruns the per-turn context window
+        aborts with an error instead of retrying. If you see &quot;Codex ran out of room in the model's context window&quot;:
+      </p>
+    </div>
+
+    <ul class="check-list">
+      <li><i class="bi bi-arrow-right-short" aria-hidden="true"></i><div>The most common cause is <code>model_reasoning_effort = "xhigh"</code> in <code>~/.codex/config.toml</code>. Reasoning tokens count toward the per-turn budget.</div></li>
+      <li><i class="bi bi-arrow-right-short" aria-hidden="true"></i><div>Pass <code>--effort=medium</code> to override the config for this run only. Valid levels: <code>none</code>, <code>minimal</code>, <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>.</div></li>
+      <li><i class="bi bi-arrow-right-short" aria-hidden="true"></i><div>Or trim the plan body and re-run.</div></li>
     </ul>
+
     <div class="callout">
       <h5>No silent retries</h5>
       <p>The plugin never auto-retries on context exhaustion or rate-limit errors. It surfaces the diagnostic and waits for your call. No surprise extra spending.</p>
@@ -429,54 +645,88 @@ git clean -fd</code></pre>
 </section>
 
 <!-- ============================================================
-     EXIT CODES (developer reference)
+     EXIT CODES
 ============================================================ -->
-<section id="exit-codes">
+<section id="exit-codes" class="section">
   <div class="container">
-    <div class="section-eyebrow">07 · Reference</div>
-    <h2 class="section-title"><a class="section-anchor" href="#exit-codes">Wrapper exit codes</a></h2>
-    <p class="section-lead">For anyone scripting around the wrapper directly.</p>
-    <table class="cg-table">
-      <thead><tr><th>code</th><th>meaning</th></tr></thead>
-      <tbody>
-        <tr><td><code>0</code></td><td>Success — Codex's final message is on stdout.</td></tr>
-        <tr><td><code>1</code></td><td>codex exec failed (turn.failed, non-zero exit, network, auth).</td></tr>
-        <tr><td><code>2</code></td><td>Working tree changed — could be Codex or you. <code>WORKING_TREE_CHANGED:&lt;files&gt;</code> is on stderr.</td></tr>
-        <tr><td><code>3</code></td><td>Codex CLI not installed or not on PATH.</td></tr>
-        <tr><td><code>4</code></td><td>Not a git working tree (containment check requires git).</td></tr>
-        <tr><td><code>64</code></td><td>Usage error — missing or invalid flag.</td></tr>
-      </tbody>
-    </table>
+    <div class="section-head">
+      <span class="section-eyebrow">07 · Reference</span>
+      <h2 class="section-title"><a class="section-anchor" href="#exit-codes">Wrapper exit codes</a></h2>
+      <p class="section-lead">For anyone scripting around the wrapper directly.</p>
+    </div>
+
+    <div class="table-wrap">
+      <table class="cg-table exit-table">
+        <thead><tr><th>code</th><th>meaning</th></tr></thead>
+        <tbody>
+          <tr><td><code class="exit-ok">0</code></td><td>Success — Codex's final message is on stdout.</td></tr>
+          <tr><td><code class="exit-err">1</code></td><td>codex exec failed (turn.failed, non-zero exit, network, auth).</td></tr>
+          <tr><td><code class="exit-err">2</code></td><td>Working tree changed — could be Codex or you. <code>WORKING_TREE_CHANGED:&lt;files&gt;</code> is on stderr.</td></tr>
+          <tr><td><code class="exit-err">3</code></td><td>Codex CLI not installed or not on PATH.</td></tr>
+          <tr><td><code class="exit-err">4</code></td><td>Not a git working tree (containment check requires git).</td></tr>
+          <tr><td><code class="exit-err">64</code></td><td>Usage error — missing or invalid flag.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     CTA
+============================================================ -->
+<section class="section section-cta" aria-label="Get started">
+  <div class="container">
+    <div class="cta-card">
+      <h2>Ready to grill some plans?</h2>
+      <p>Two CLI prereqs, three slash commands. Live in 30 seconds.</p>
+      <div class="hero-cta">
+        <a class="btn-primary" href="#install">
+          <i class="bi bi-download" aria-hidden="true"></i>
+          <span>Install codexgrill</span>
+        </a>
+        <a class="btn-ghost" href="https://github.com/codeseasy/codexgrill" target="_blank" rel="noopener">
+          <i class="bi bi-github" aria-hidden="true"></i>
+          <span>Star on GitHub</span>
+        </a>
+      </div>
+    </div>
   </div>
 </section>
 
 <!-- ============================================================
      FOOTER
 ============================================================ -->
-<footer class="cg-footer">
+</main>
+
+<footer class="cg-footer" role="contentinfo">
   <div class="container">
-    <div class="row g-4">
-      <div class="col-md-6">
-        <div class="cg-brand" style="font-size: 1rem; margin-bottom: 0.5rem;">
-          <span class="cg-brand-dot"></span>
-          <span>codexgrill</span>
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="cg-brand">
+          <span class="cg-brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="22" height="22">
+              <rect width="32" height="32" rx="7" fill="currentColor"/>
+              <path d="M9 11h14M9 16h10M9 21h7" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="cg-brand-name">codexgrill</span>
         </div>
-        <p style="margin: 0; max-width: 520px;">
+        <p class="muted">
           Adversarial plan review for Claude Code. Built with the
           <a href="https://github.com/openai/codex" target="_blank" rel="noopener">Codex CLI</a> as the second opinion.
         </p>
       </div>
-      <div class="col-md-3">
-        <strong style="display: block; margin-bottom: 0.6rem; color: var(--bs-emphasis-color);">Links</strong>
-        <ul class="list-unstyled" style="line-height: 1.9;">
+      <div class="footer-col">
+        <strong>Links</strong>
+        <ul>
           <li><a href="https://github.com/codeseasy/codexgrill" target="_blank" rel="noopener">GitHub repository</a></li>
           <li><a href="https://github.com/codeseasy/codexgrill/issues" target="_blank" rel="noopener">Report an issue</a></li>
           <li><a href="https://github.com/openai/codex" target="_blank" rel="noopener">Codex CLI</a></li>
         </ul>
       </div>
-      <div class="col-md-3">
-        <strong style="display: block; margin-bottom: 0.6rem; color: var(--bs-emphasis-color);">Docs</strong>
-        <ul class="list-unstyled" style="line-height: 1.9;">
+      <div class="footer-col">
+        <strong>Docs</strong>
+        <ul>
           <li><a href="#install">Install</a></li>
           <li><a href="#usage">Usage</a></li>
           <li><a href="#how-it-works">How it works</a></li>
@@ -486,13 +736,12 @@ git clean -fd</code></pre>
     </div>
 
     <div class="footer-disclaimer">
-      <p style="margin: 0;">
-        © <span data-year>2026</span> codeseasy &nbsp;·&nbsp;
-        <a href="https://github.com/codeseasy/codexgrill/blob/main/LICENSE" target="_blank" rel="noopener">MIT licensed</a>
-        &nbsp;·&nbsp;
+      <p>
+        © <span data-year>2026</span> codeseasy ·
+        <a href="https://github.com/codeseasy/codexgrill/blob/main/LICENSE" target="_blank" rel="noopener">MIT licensed</a> ·
         Runtime dependency on the <a href="https://github.com/openai/codex" target="_blank" rel="noopener">Codex CLI</a> — not redistributed.
       </p>
-      <p style="margin: 0.6rem 0 0; color: var(--bs-tertiary-color);">
+      <p class="dim">
         Community plugin. Not affiliated with OpenAI or Anthropic. Requires the
         <code>codex</code> CLI installed and authenticated (<code>codex login</code>), plus Node.js.
       </p>
@@ -500,8 +749,6 @@ git clean -fd</code></pre>
   </div>
 </footer>
 
-<!-- Bootstrap JS (bundled — includes Popper) -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="./assets/app.js"></script>
 </body>
 </html>

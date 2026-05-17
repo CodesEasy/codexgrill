@@ -1,0 +1,21 @@
+# codexgrill.com — robots.txt
+User-agent: *
+Allow: /
+
+# AI crawlers — explicit allow (this is a docs page for an AI dev tool)
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+Sitemap: https://codexgrill.com/sitemap.xml
