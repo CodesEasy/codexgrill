@@ -3,7 +3,7 @@ description: Loop Codex review + Claude validation until convergence, then prese
 argument-hint: "[path/to/plan.md] [--max=N] [--effort=<level>] [--model=<name>]"
 ---
 
-Iteratively review and refine a plan with Codex (read-only) and Claude (validates + edits). The loop pins Codex to one thread: iter 1 captures the `thread_id` from Codex's JSONL stream; every later iter passes that UUID to `codex exec resume <id>` to preserve conversation context. Every iteration inlines the FULL updated plan in the prompt so Codex always reviews the current text (accuracy first; the cache still covers the template).
+Iteratively review and refine a plan with Codex (read-only) and Claude (validates + edits). The loop pins Codex to one thread: iter 1 captures the `thread_id` from Codex's JSONL stream; every later iter passes that UUID to `codex exec resume <id>` to preserve conversation context. Iter 1 sends the full plan inline. Resume iterations send a unified diff of plan changes since the last review plus the absolute path to the current plan (Codex pulls full context on demand via its file-read tools) — this keeps each turn small. The wrapper transparently falls back to inlining the full plan when the prior snapshot is missing, the diff is empty (no edits), or the diff is pathologically large (>80% of plan body).
 
 Raw arguments: `$ARGUMENTS`
 
@@ -66,7 +66,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
   [--effort <EFFORT>] [--model <MODEL>]
 ```
 
-**Iteration 2+** (resume the pinned thread; the wrapper sends the FULL updated plan + cumulative refuted-log every iteration so Codex always reviews the current text):
+**Iteration 2+** (resume the pinned thread; the wrapper auto-selects a unified-diff prompt when iter 1 wrote a snapshot, falling back to full-plan inline for missing-snapshot / no-change / pathological-diff cases — see README "Artifacts" section for the `resumePromptMode` field on `result-iter<N>.json`):
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
   --plan "<PLAN_PATH>" \
@@ -91,7 +91,7 @@ Omit `--refuted-log` for iter 2 if no refutations exist yet — the wrapper trea
 
 #### Exit 2 — working-tree changed
 
-Read the stderr marker `WORKING_TREE_CHANGED:<comma-separated-files>` and `$RUN_DIR/result-iter<i>.json` for `preIterStash.hash` / `preIterStash.isEmpty`. **STOP THE LOOP** at this iteration. Print under `### Working-tree changed (iter <i>)`:
+Read the stderr marker `WORKING_TREE_CHANGED:<comma-separated-files>` and `$RUN_DIR/result-iter<i>.json` for `preIterStash.hash` / `preIterStash.isEmpty` / `preIterStash.noHead` (all three are needed for the revert dispatch below). **STOP THE LOOP** at this iteration. Print under `### Working-tree changed (iter <i>)`:
 
 > Hi — I found these files changed during the codexgrill loop:
 > - `<file1>`
@@ -104,14 +104,26 @@ Wait for the user's answer. Do not call `ExitPlanMode`.
 - **User says yes (they edited / it was their IDE) — continue the loop:** acknowledge ("OK, continuing the loop") and resume at iter `<i+1>`. **No special handling needed** — the next iteration's wrapper run takes a fresh `snapshotBefore` that already includes the user's edits as the new baseline, so they won't re-trip. Do not "reset" anything. Additionally, **if the changed file looks like auto-generated noise that's currently tracked** (e.g., `.idea/*.iml`, build artifacts, framework caches — anything the user wouldn't intentionally edit), ask: "Want me to add `<file>` to `.gitignore` so this check doesn't trip on it again? Only say yes if it's truly auto-generated — committing it might be intentional." If yes, append the path (or a sensible pattern like `<dir>/`) to the project's root `.gitignore` before resuming.
 - **User says no / "it must be Codex":** say:
   > Then this looks like Codex breaking the read-only contract. What would you like me to do?
-  > - **Revert** the working tree to the state right before iter `<i>` started (we saved a `git stash` snapshot). I'll run `git stash apply <preIterStash.hash>`.
+  > - **Revert** the working tree to the content state from before iter `<i>` started. This restores file contents; files that were originally untracked will appear as staged additions afterward (a known limitation of the snapshot format — your `git status` will look slightly different from before, but every file's bytes will match).
   > - **Stop** the loop and leave the changes in place so you can inspect.
 
-  If the user accepts revert and `preIterStash.isEmpty === false`: run `git stash apply <preIterStash.hash>`. If `git stash apply` reports conflicts, surface the conflict list and stop — don't force.
+  If the user accepts revert, dispatch on `preIterStash`:
 
-  If `preIterStash.isEmpty === true` (clean tree before this iter): there's no stash to apply. The revert is `git reset --hard HEAD` + `git clean -df`. **Both destructive — ask the user to confirm before running.**
+  - `preIterStash.isEmpty === false` (snapshot exists — with or without HEAD): run
+    ```bash
+    git restore --source=<preIterStash.hash> --staged --worktree -- :/
+    git clean -fd
+    ```
+    Both are destructive on the current working tree. Ask the user to confirm before running, then verify with `git status` after.
 
-  If `preIterStash.noHead === true` (fresh repo, no initial commit): no HEAD, so neither `git stash apply` nor `git reset --hard HEAD` works. The only revert is `git clean -df` for untracked files. Tell the user this and ask whether to run it or stop and let them inspect.
+  - `preIterStash.isEmpty === true` and `preIterStash.noHead === false` (clean tree before this iter, HEAD exists): no snapshot was built. Restore from HEAD:
+    ```bash
+    git restore --source=HEAD --staged --worktree -- :/
+    git clean -fd
+    ```
+    Both destructive — confirm first.
+
+  - `preIterStash.isEmpty === true` and `preIterStash.noHead === true` (fresh repo with no commits and an empty pre-run tree): there's no prior content to bring back. `git clean -fd` is the full revert; ask the user to confirm.
 
 ### C. Print Codex's review
 

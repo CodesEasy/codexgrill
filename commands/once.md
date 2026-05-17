@@ -55,7 +55,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
 
 #### Exit 2 — working-tree changed
 
-Read the stderr marker `WORKING_TREE_CHANGED:<comma-separated-files>` and `$RUN_DIR/result.json` for `preIterStash.hash` / `preIterStash.isEmpty`. Print under `### Working-tree changed`:
+Read the stderr marker `WORKING_TREE_CHANGED:<comma-separated-files>` and `$RUN_DIR/result.json` for `preIterStash.hash` / `preIterStash.isEmpty` / `preIterStash.noHead` (all three are needed for the revert dispatch below). Print under `### Working-tree changed`:
 
 > Hi — I found these files changed during this run:
 > - `<file1>`
@@ -68,14 +68,26 @@ Halt. Do **not** edit the plan. Do **not** call `ExitPlanMode`. Wait for the use
 - **User says yes (they edited / it was their IDE):** acknowledge ("OK — leaving things as they are"). Then, **if the changed file looks like auto-generated noise that's currently tracked** (e.g., `.idea/*.iml`, build artifacts, framework caches — anything the user wouldn't intentionally edit), ask: "Want me to add `<file>` to `.gitignore` so this check doesn't trip on it again? Only say yes if it's truly auto-generated — committing it might be intentional." If yes, append the path (or a sensible pattern like `<dir>/`) to the project's root `.gitignore`. Then stop — user can re-invoke when ready.
 - **User says no / "it must be Codex":** say:
   > Then this looks like Codex breaking the read-only contract. What would you like me to do?
-  > - **Revert** the working tree to the state right before this run started (we saved a `git stash` snapshot). I'll run `git stash apply <hash>`.
+  > - **Revert** the working tree to the content state from before this run started. This restores file contents; files that were originally untracked will appear as staged additions afterward (a known limitation of the snapshot format — your `git status` will look slightly different from before, but every file's bytes will match).
   > - **Stop** the run and leave the changes in place so you can inspect.
 
-  If the user accepts revert and `preIterStash.isEmpty === false`: run `git stash apply <preIterStash.hash>`. If `git stash apply` reports conflicts, surface the conflict list and stop — don't force.
+  If the user accepts revert, dispatch on `preIterStash`:
 
-  If `preIterStash.isEmpty === true` (clean tree before the run): there's no stash to apply. The revert is `git reset --hard HEAD` (undo tracked changes) + `git clean -df` (remove new untracked files). **Both destructive — ask the user to confirm before running.**
+  - `preIterStash.isEmpty === false` (snapshot exists — with or without HEAD): run
+    ```bash
+    git restore --source=<preIterStash.hash> --staged --worktree -- :/
+    git clean -fd
+    ```
+    Both are destructive on the current working tree. Ask the user to confirm before running, then verify with `git status` after.
 
-  If `preIterStash.noHead === true` (fresh repo, no initial commit): no HEAD, so neither `git stash apply` nor `git reset --hard HEAD` works. The only revert is `git clean -df` for untracked files (won't touch staged changes). Tell the user this and ask whether to run `git clean -df` or stop and let them inspect.
+  - `preIterStash.isEmpty === true` and `preIterStash.noHead === false` (clean tree before the run, HEAD exists): no snapshot was built. Restore from HEAD:
+    ```bash
+    git restore --source=HEAD --staged --worktree -- :/
+    git clean -fd
+    ```
+    Both destructive — confirm first.
+
+  - `preIterStash.isEmpty === true` and `preIterStash.noHead === true` (fresh repo with no commits and an empty pre-run tree): there's no prior content to bring back. `git clean -fd` is the full revert; ask the user to confirm.
 
 ### 5. Print Codex's review
 
