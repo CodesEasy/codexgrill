@@ -387,7 +387,7 @@
 <pre><code>/codexgrill:once                            <span class="cmt"># grills this session's plan</span>
 /codexgrill:once path/to/plan.md            <span class="cmt"># grills the given file</span>
 /codexgrill:once --effort=xhigh             <span class="cmt"># override reasoning effort</span>
-/codexgrill:once --model=gpt-5.1-codex      <span class="cmt"># override model</span></code></pre>
+/codexgrill:once --model=gpt-5.4             <span class="cmt"># override model</span></code></pre>
         </div>
         <p class="dim small">
           Best for fast sanity checks before implementation. One round-trip with Codex, full plan inlined.
@@ -408,7 +408,7 @@
 /codexgrill:loop path/to/plan.md            <span class="cmt"># grills the given file</span>
 /codexgrill:loop --max=10                   <span class="cmt"># bump the cap (default 7)</span>
 /codexgrill:loop --effort=xhigh             <span class="cmt"># override reasoning effort</span>
-/codexgrill:loop --model=gpt-5.1-codex      <span class="cmt"># override model</span></code></pre>
+/codexgrill:loop --model=gpt-5.4             <span class="cmt"># override model</span></code></pre>
         </div>
         <p class="dim small">
           Pins Codex to one thread (so context + cache are preserved across iters) and sends a

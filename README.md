@@ -29,7 +29,7 @@ From inside Claude Code:
 /codexgrill:once                            # grills this session's plan
 /codexgrill:once path/to/plan.md            # grills the given file
 /codexgrill:once --effort=xhigh             # override reasoning effort
-/codexgrill:once --model=gpt-5.1-codex      # override model
+/codexgrill:once --model=gpt-5.4             # override model
 ```
 
 ### Loop until clean — `/codexgrill:loop`
@@ -38,7 +38,7 @@ From inside Claude Code:
 /codexgrill:loop path/to/plan.md            # grills the given file
 /codexgrill:loop --max=10                   # bump the iteration cap (default 7)
 /codexgrill:loop --effort=xhigh             # override reasoning effort
-/codexgrill:loop --model=gpt-5.1-codex      # override model
+/codexgrill:loop --model=gpt-5.4             # override model
 ```
 
 Exits when Codex says **SOUND** and Claude has no remaining findings.
