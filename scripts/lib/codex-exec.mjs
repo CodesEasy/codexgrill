@@ -590,6 +590,54 @@ export function assertContainment(before, after) {
   throw new WorkingTreeChangedError(changed);
 }
 
+// Compute a unified diff between two files using `git diff --no-index`. Works
+// inside or outside a git repo; both paths should be absolute. Returns:
+//   { exitCode, stdout, stderr }
+// Exit code semantics (different from most git subcommands):
+//   0   — files are identical (stdout empty)
+//   1   — files differ (stdout contains the unified diff) — SUCCESS, not error
+//   >=2 — real failure (missing file, IO) — throws Error with stderr tail
+// Spawn failures (git binary missing) throw GitUnavailableError so the caller
+// can fall back to a diff-free prompt path without aborting the whole run.
+//
+// `--ignore-cr-at-eol` defends against editor-induced LF/CRLF drift creating
+// spurious diffs on Windows. `--` guards against paths with leading `-`.
+export async function diffNoIndex(oldPath, newPath, { contextLines = 10, cwd = process.cwd() } = {}) {
+  return await new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawn('git', [
+        'diff',
+        '--no-index',
+        '--ignore-cr-at-eol',
+        `-U${contextLines}`,
+        '--',
+        oldPath,
+        newPath,
+      ], { cwd });
+    } catch (err) {
+      reject(new GitUnavailableError(err.message));
+      return;
+    }
+    const outChunks = [];
+    let errOut = '';
+    child.stdout.on('data', (d) => { outChunks.push(d); });
+    child.stderr.on('data', (d) => { errOut += d.toString('utf8'); });
+    child.on('error', (err) => {
+      reject(new GitUnavailableError(err.message));
+    });
+    child.on('close', (code) => {
+      const exitCode = code ?? 0;
+      const stdout = Buffer.concat(outChunks).toString('utf8');
+      if (exitCode >= 2) {
+        reject(new Error(`git diff --no-index failed (exit ${exitCode}): ${errOut.trim() || 'no stderr'}`));
+        return;
+      }
+      resolve({ exitCode, stdout, stderr: errOut });
+    });
+  });
+}
+
 // Non-throwing git runner. Returns `{ stdout, stderr, exitCode }` for any
 // process completion (including non-zero exits) so probes can branch on the
 // code; throws `GitUnavailableError` only when spawn itself fails (e.g., git
