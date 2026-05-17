@@ -787,7 +787,12 @@ em {
   tab-size: 2;
 }
 @media (max-width: 520px) {
-  .code-block pre { padding: 0.85rem 0.95rem; font-size: 0.78rem; }
+  .code-block pre {
+    padding: 0.85rem 0.95rem;
+    font-size: 0.78rem;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
 }
 .code-block pre code { color: inherit; background: transparent; padding: 0; border: none; font-size: inherit; font-weight: 500; }
 .code-block pre .cmt { color: var(--fg-dim); font-style: italic; }
