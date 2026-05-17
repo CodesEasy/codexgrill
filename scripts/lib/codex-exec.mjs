@@ -11,6 +11,7 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream, promises as fs } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import readline from 'node:readline';
 
@@ -436,7 +437,7 @@ export async function snapshotWorkingTree(cwd = process.cwd()) {
   const { stdout, stderr, exitCode } = await new Promise((resolve, reject) => {
     let child;
     try {
-      child = spawn('git', ['status', '--porcelain=v1', '-z'], { cwd });
+      child = spawn('git', ['status', '--porcelain=v1', '-z', '--untracked-files=all'], { cwd });
     } catch (err) {
       reject(new GitUnavailableError(err.message));
       return;
@@ -516,18 +517,15 @@ export function assertContainment(before, after) {
   throw new WorkingTreeChangedError(changed);
 }
 
-// Capture the dirty + untracked working-tree state in a commit without
-// modifying the working tree or the stash list. Pin it with a permanent ref
-// so it survives gc and can be applied later by the user for revert.
-// Returns: { stashHash: string|null, refName: string|null, isEmpty: boolean, noHead?: boolean }.
-// stashHash is null when the working tree is clean (nothing to stash) OR when
-// the repo has no initial commit (HEAD missing). The noHead flag distinguishes
-// the second case so the exit-2 handler can tell the user revert isn't available.
-export async function createPreIterStash(cwd, runId, iter) {
-  const result = await new Promise((resolve, reject) => {
+// Non-throwing git runner. Returns `{ stdout, stderr, exitCode }` for any
+// process completion (including non-zero exits) so probes can branch on the
+// code; throws `GitUnavailableError` only when spawn itself fails (e.g., git
+// binary missing).
+async function runGit(args, { cwd, env } = {}) {
+  return await new Promise((resolve, reject) => {
     let child;
     try {
-      child = spawn('git', ['stash', 'create', '-u'], { cwd });
+      child = spawn('git', args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (err) {
       reject(new GitUnavailableError(err.message));
       return;
@@ -538,52 +536,84 @@ export async function createPreIterStash(cwd, runId, iter) {
     child.stderr.on('data', (d) => { stderr += d.toString('utf8'); });
     child.on('error', (err) => reject(new GitUnavailableError(err.message)));
     child.on('close', (code) => {
-      if (code !== 0) {
-        if (/not a git repository/i.test(stderr)) {
-          reject(new NotAGitRepoError(cwd));
-          return;
-        }
-        // Fresh repo with no commits yet — `git stash create` needs HEAD.
-        // Skip the stash cleanly; the run continues, but revert won't be available.
-        if (/do not have the initial commit|bad revision .?HEAD/i.test(stderr)) {
-          resolve({ hash: null, noHead: true });
-          return;
-        }
-        reject(new Error(`git stash create failed (${code}): ${stderr.trim() || 'no stderr'}`));
-        return;
-      }
-      resolve({ hash: stdout.trim() || null, noHead: false });
+      resolve({ stdout, stderr, exitCode: code ?? 0 });
     });
   });
+}
 
-  if (result.noHead) {
-    return { stashHash: null, refName: null, isEmpty: true, noHead: true };
+// Must-succeed wrapper. Throws on non-zero exit so a failed plumbing step
+// can't silently produce an empty sha that gets passed to the next command.
+async function runGitOrThrow(args, opts = {}) {
+  const r = await runGit(args, opts);
+  if (r.exitCode !== 0) {
+    throw new Error(`git ${args.join(' ')} failed (${r.exitCode}): ${r.stderr.trim() || 'no stderr'}`);
   }
-  if (!result.hash) {
-    return { stashHash: null, refName: null, isEmpty: true };
-  }
-  const stashHash = result.hash;
+  return r;
+}
 
+// Capture tracked + untracked working-tree content as a single tree-commit,
+// pinned under a permanent ref like `refs/codexgrill/<runId>/iter-<N>-pre`.
+// Uses a temporary index (GIT_INDEX_FILE) so the user's index, working tree,
+// and stash list are untouched. Works with or without an initial commit — in
+// no-HEAD repos the snapshot is a parentless root commit so the same restore
+// procedure applies.
+//
+// Returns: { stashHash, refName, isEmpty, noHead }.
+//   stashHash  snapshot commit sha, or null when isEmpty.
+//   refName    pinned ref name, or null when isEmpty.
+//   isEmpty    true when there were no dirty / untracked / staged paths.
+//   noHead     true when the repo has no initial commit (recovery semantics
+//              differ slightly — see commands/once.md / commands/loop.md).
+export async function createPreIterStash(cwd, runId, iter) {
+  // 0. HEAD probe. Non-zero exit means either "not a git repo" (throw) or
+  //    "no initial commit yet" (proceed with noHead=true). Does NOT short-
+  //    circuit — even in no-HEAD repos we still build a snapshot so the
+  //    recovery procedure can undo Codex modifications to already-staged files.
+  const headProbe = await runGit(['rev-parse', '--verify', 'HEAD'], { cwd });
+  if (headProbe.exitCode !== 0 && /not a git repository/i.test(headProbe.stderr)) {
+    throw new NotAGitRepoError(cwd);
+  }
+  const noHead = headProbe.exitCode !== 0;
+  const headSha = noHead ? null : headProbe.stdout.trim();
   const refName = `refs/codexgrill/${runId}/iter-${iter}-pre`;
-  await new Promise((resolve, reject) => {
-    let child;
-    try {
-      child = spawn('git', ['update-ref', refName, stashHash], { cwd });
-    } catch (err) {
-      reject(new GitUnavailableError(err.message));
-      return;
-    }
-    let stderr = '';
-    child.stderr.on('data', (d) => { stderr += d.toString('utf8'); });
-    child.on('error', (err) => reject(new GitUnavailableError(err.message)));
-    child.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`git update-ref ${refName} failed (${code}): ${stderr.trim() || 'no stderr'}`));
-        return;
-      }
-      resolve();
-    });
-  });
 
-  return { stashHash, refName, isEmpty: false };
+  // 1. Cheap "nothing to capture" short-circuit.
+  const dirty = await runGit(
+    ['status', '--porcelain=v1', '-z', '--untracked-files=all'],
+    { cwd },
+  );
+  if (dirty.exitCode !== 0) {
+    if (/not a git repository/i.test(dirty.stderr)) {
+      throw new NotAGitRepoError(cwd);
+    }
+    throw new Error(`git status failed (${dirty.exitCode}): ${dirty.stderr.trim() || 'no stderr'}`);
+  }
+  if (!dirty.stdout) {
+    return { stashHash: null, refName: null, isEmpty: true, noHead };
+  }
+
+  // 2. Build the snapshot tree in a TEMP index so the user's index isn't touched.
+  const tmpIndex = path.join(os.tmpdir(), `codexgrill-idx-${runId}-${iter}-${process.pid}`);
+  const env = { ...process.env, GIT_INDEX_FILE: tmpIndex };
+  try {
+    if (!noHead) {
+      // Seed temp index from HEAD so deletions register as deletions.
+      await runGitOrThrow(['read-tree', 'HEAD'], { cwd, env });
+    }
+    // Stage tracked-dirty + untracked into the temp index.
+    await runGitOrThrow(['add', '-A'], { cwd, env });
+    const treeSha = (await runGitOrThrow(['write-tree'], { cwd, env })).stdout.trim();
+
+    // commit-tree: with HEAD → parent=HEAD; without HEAD → parentless root commit.
+    const commitArgs = ['commit-tree', treeSha];
+    if (headSha) commitArgs.push('-p', headSha);
+    commitArgs.push('-m', `codexgrill pre-iter ${iter}${noHead ? ' (no HEAD)' : ''}`);
+    const stashSha = (await runGitOrThrow(commitArgs, { cwd, env })).stdout.trim();
+
+    // Pin BEFORE deleting the temp index so the commit is reachable.
+    await runGitOrThrow(['update-ref', refName, stashSha], { cwd });
+    return { stashHash: stashSha, refName, isEmpty: false, noHead };
+  } finally {
+    await fs.unlink(tmpIndex).catch(() => {});
+  }
 }
