@@ -3,7 +3,11 @@
 //
 // Drives a single `codex exec` review iteration. Once-mode and loop-mode each
 // shell out to this script per iteration; loop-mode pins the thread by passing
-// the captured thread_id back via --resume-thread-id.
+// the captured thread_id back via --resume-thread-id. In loop-mode resume
+// iterations, the wrapper auto-switches to a diff-based prompt when a prior
+// snapshot of the plan exists, sending only a unified diff plus the plan path
+// (Codex pulls full context on demand). Falls back to the full-plan inline
+// prompt for missing snapshot, pathological-size diff, or no-change cases.
 //
 // CLI:
 //   node plan-review.mjs --plan <path> --run-dir <path> [--mode fresh|resume]
@@ -29,6 +33,7 @@ import {
   assertContainment,
   createPreIterStash,
   matchesIgnorePattern,
+  diffNoIndex,
   CodexNotInstalledError,
   CodexExecFailedError,
   WorkingTreeChangedError,
@@ -36,6 +41,11 @@ import {
   GitUnavailableError,
   InvalidEffortError,
 } from './lib/codex-exec.mjs';
+
+// Threshold beyond which the diff is "pathological" — bigger than 80% of the
+// plan body means full-plan inline is roughly as cheap as the diff. Fall back
+// for completeness/accuracy when this triggers.
+const PATHOLOGICAL_DIFF_RATIO = 0.8;
 
 const PROMPT_TEMPLATE = `<task>
 You are a senior staff engineer doing a strict pre-implementation review of a
@@ -114,7 +124,15 @@ function parseArgs(argv) {
       case '--run-dir': out.runDir = next(); break;
       case '--mode': out.mode = next(); break;
       case '--resume-thread-id': out.resumeThreadId = next(); break;
-      case '--iter': out.iter = parseInt(next(), 10); break;
+      case '--iter': {
+        const raw = next();
+        if (!/^\d+$/.test(raw)) {
+          process.stderr.write(`--iter must be a positive integer (got: ${raw})\n`);
+          process.exit(64);
+        }
+        out.iter = parseInt(raw, 10);
+        break;
+      }
       case '--effort': out.effort = next(); break;
       case '--model': out.model = next(); break;
       case '--refuted-log': out.refutedLog = next(); break;
@@ -218,6 +236,88 @@ optional "What to add" / "What to remove" / "External refs checked" sections.
   return parts.join('');
 }
 
+// Diff-mode resume prompt: instructions + path (stable prefix for prompt
+// cache) + optional refuted-log + unified diff (iter-varying tail).
+function buildResumePromptDiff({ absolutePlanPath, refutedLog, diffOutput, contextLines = 10 }) {
+  const parts = [];
+  parts.push(
+`I have applied the CONFIRMED findings from your prior review and edited the
+plan. To keep this turn small, I am sending you the UNIFIED DIFF of the plan
+since your last review, not the whole plan body. The full updated plan lives
+on disk at the path below — use your file-reading tools to load any section
+you need surrounding context for before issuing a finding. Do NOT rely on
+your memory of the earlier plan text; load the current file when in doubt.
+
+Same READ-ONLY contract as before: do not modify, create, or delete files.
+Same output contract: first-line verdict (SOUND / NEEDS REVISION / FUNDAMENTAL
+ISSUES), bulleted findings with severity + \`path:line\` / URL citations,
+optional "What to add" / "What to remove" / "External refs checked" sections.
+
+Focus on whether the edits addressed prior findings and on any new issues the
+edits introduced. If a prior finding's region is unchanged in the diff, state
+explicitly whether you are re-raising it or withdrawing it.
+
+<current_plan_path>
+${absolutePlanPath}
+</current_plan_path>
+`);
+  if (refutedLog && refutedLog.trim().length > 0) {
+    parts.push(`
+<previously_refuted>
+${refutedLog.endsWith('\n') ? refutedLog : refutedLog + '\n'}</previously_refuted>
+`);
+  }
+  parts.push(`
+<plan_diff format="unified" context_lines="${contextLines}">
+${diffOutput.endsWith('\n') ? diffOutput : diffOutput + '\n'}</plan_diff>
+`);
+  return parts.join('');
+}
+
+// Empty-diff resume prompt: surfaces possible loop pathology with explicit
+// wording. Same order rule (refuted-log before would-be diff slot).
+function buildResumePromptNoChange({ absolutePlanPath, refutedLog }) {
+  const parts = [];
+  parts.push(
+`The plan is byte-identical to what you reviewed in the prior iteration — no
+edits were applied. Only the previously-refuted log (below, if any) has
+changed. Please re-confirm whether your prior findings still hold against the
+current plan at the path below, or withdraw any that you now reconsider.
+Same READ-ONLY + output contract as before.
+
+<current_plan_path>${absolutePlanPath}</current_plan_path>
+`);
+  if (refutedLog && refutedLog.trim().length > 0) {
+    parts.push(`
+<previously_refuted>
+${refutedLog.endsWith('\n') ? refutedLog : refutedLog + '\n'}</previously_refuted>
+`);
+  }
+  return parts.join('');
+}
+
+// Count +/- lines in a unified diff body. Excludes the `+++ ` / `--- ` file
+// headers and the `\ No newline at end of file` markers.
+function parseDiffStats(diffOutput) {
+  let addedLines = 0;
+  let removedLines = 0;
+  const lines = String(diffOutput || '').split('\n');
+  for (const line of lines) {
+    if (line.startsWith('+++ ') || line.startsWith('--- ')) continue;
+    if (line.startsWith('+')) addedLines++;
+    else if (line.startsWith('-')) removedLines++;
+  }
+  return { addedLines, removedLines };
+}
+
+// Copy the plan body verbatim (preserves exact bytes — no encoding/EOL drift)
+// into the run-dir as a snapshot baseline for the NEXT iteration's diff.
+async function writePlanSnapshot(runDir, iter, planPath) {
+  const snapshotPath = path.join(runDir, `plan-snapshot-iter${iter}.md`);
+  await fs.copyFile(planPath, snapshotPath);
+  return snapshotPath;
+}
+
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
 
@@ -252,6 +352,10 @@ async function main() {
       throw err;
     }
   }
+  if (opts.ephemeral && opts.mode === 'resume') {
+    process.stderr.write(`--ephemeral is only valid with --mode fresh (codex resume requires session persistence)\n`);
+    process.exit(64);
+  }
 
   const planPath = resolveFromCwd(opts.plan);
   try {
@@ -279,9 +383,99 @@ async function main() {
 
   const refutedLogPath = opts.refutedLog ? resolveFromCwd(opts.refutedLog) : null;
 
-  const promptText = opts.mode === 'fresh'
-    ? await buildFreshPrompt({ planPath, refutedLogPath })
-    : await buildResumePrompt({ planPath, refutedLogPath });
+  // Resume-mode dispatch artifacts — populated when mode==='resume' and a
+  // prior snapshot exists. Captured here so they can flow into result-iter<N>.json.
+  let resumePromptMode = null;     // 'diff' | 'full-plan-fallback' | 'no-change' (null for fresh)
+  let planDiffPath = null;
+  let planDiffStats = null;
+
+  let promptText;
+  if (opts.mode === 'fresh') {
+    promptText = await buildFreshPrompt({ planPath, refutedLogPath });
+  } else {
+    // Resume mode: try diff-based prompt; fall back to full-plan if anything
+    // about the diff path is uncertain. The full-plan fallback is the same
+    // prompt the wrapper sent before this feature existed.
+    const priorSnapshotPath = path.join(runDir, `plan-snapshot-iter${opts.iter - 1}.md`);
+    let priorSnapshotExists = false;
+    try {
+      await fs.access(priorSnapshotPath);
+      priorSnapshotExists = true;
+    } catch { /* missing → fallback */ }
+
+    const refutedLog = await readIfExists(refutedLogPath);
+
+    const fallbackToFullPlan = async (reason) => {
+      process.stderr.write(`[wrapper] resume: ${reason}, falling back to full-plan inline\n`);
+      resumePromptMode = 'full-plan-fallback';
+      promptText = await buildResumePrompt({ planPath, refutedLogPath });
+    };
+
+    if (!priorSnapshotExists) {
+      await fallbackToFullPlan('prior snapshot missing');
+    } else {
+      let diffResult;
+      try {
+        diffResult = await diffNoIndex(priorSnapshotPath, planPath, { cwd });
+      } catch (err) {
+        if (err instanceof GitUnavailableError) {
+          await fallbackToFullPlan(`git diff unavailable (${err.message})`);
+        } else {
+          await fallbackToFullPlan(`git diff failed (${err.message})`);
+        }
+        diffResult = null;
+      }
+
+      if (diffResult) {
+        const diffOutput = diffResult.stdout;
+        const diffBytes = Buffer.byteLength(diffOutput, 'utf8');
+        const planBytes = (await fs.stat(planPath)).size;
+
+        if (diffResult.exitCode === 0) {
+          // Exit 0 = files identical — empty diff branch.
+          resumePromptMode = 'no-change';
+          process.stderr.write(`[wrapper] resume mode: no-change (plan=${planBytes}b, diff=0b)\n`);
+          promptText = buildResumePromptNoChange({
+            absolutePlanPath: planPath,
+            refutedLog,
+          });
+        } else if (diffOutput.length === 0) {
+          // Exit 1 with empty stdout means git couldn't access one of the
+          // files (race / permissions / similar). Both paths were validated
+          // upstream so this is rare — fall back to full-plan for safety
+          // rather than wrongly treating it as "no changes".
+          const stderrTail = (diffResult.stderr || '').trim().split('\n').slice(-2).join(' | ') || '(no stderr)';
+          await fallbackToFullPlan(`empty diff body despite exit 1 (${stderrTail})`);
+        } else if (diffBytes > planBytes * PATHOLOGICAL_DIFF_RATIO) {
+          const pct = Math.round((diffBytes / planBytes) * 100);
+          await fallbackToFullPlan(`diff too large (${pct}% of plan)`);
+        } else {
+          // Normal diff-mode path.
+          resumePromptMode = 'diff';
+          const stats = parseDiffStats(diffOutput);
+          planDiffStats = { ...stats, planBytes, diffBytes };
+          // The diff file is purely observability — the prompt content is in
+          // memory regardless. A write failure shouldn't crash the iter; log
+          // and leave planDiffPath null so result.json reflects reality.
+          const candidateDiffPath = path.join(runDir, `plan-diff-iter${opts.iter}.diff`);
+          try {
+            await fs.writeFile(candidateDiffPath, diffOutput, 'utf8');
+            planDiffPath = candidateDiffPath;
+          } catch (err) {
+            process.stderr.write(`[wrapper] failed to write plan-diff-iter${opts.iter}.diff: ${err.message} (continuing with in-memory diff)\n`);
+          }
+          process.stderr.write(
+            `[wrapper] resume mode: diff (added=${stats.addedLines}, removed=${stats.removedLines}, plan=${planBytes}b, diff=${diffBytes}b)\n`,
+          );
+          promptText = buildResumePromptDiff({
+            absolutePlanPath: planPath,
+            refutedLog,
+            diffOutput,
+          });
+        }
+      }
+    }
+  }
 
   let snapshotBefore;
   try {
@@ -386,6 +580,26 @@ async function main() {
     }
   }
 
+  // Decide whether the snapshot copy should run (loop-mode + all success gates
+  // pass), attempt it now, and record the ACTUAL outcome in result.json. Doing
+  // this BEFORE the result.json write means the recorded planSnapshotPath
+  // matches reality — null on failure or skip, real path only on a successful
+  // copy. A snapshot copy error doesn't fail the iter; the next iter will
+  // gracefully fall back to full-plan inline if no snapshot is present.
+  const willWriteSnapshot = !onceNaming
+    && containmentExit === 0
+    && !execResult.errorReason
+    && execResult.exitCode === 0;
+
+  let actualSnapshotPath = null;
+  if (willWriteSnapshot) {
+    try {
+      actualSnapshotPath = await writePlanSnapshot(runDir, opts.iter, planPath);
+    } catch (err) {
+      process.stderr.write(`[wrapper] failed to write plan-snapshot-iter${opts.iter}.md: ${err.message}\n`);
+    }
+  }
+
   const resultFileName = onceNaming ? 'result.json' : `result-iter${opts.iter}.json`;
   const resultPath = path.join(runDir, resultFileName);
   const resultPayload = {
@@ -407,6 +621,10 @@ async function main() {
     },
     workingTreeChanged: containmentExit === 2,
     changedFiles,
+    resumePromptMode,
+    planSnapshotPath: actualSnapshotPath,
+    planDiffPath,
+    planDiffStats,
   };
   await fs.writeFile(resultPath, JSON.stringify(resultPayload, null, 2), 'utf8');
 
