@@ -2,8 +2,6 @@
 
 **Adversarial plan review for Claude Code.** Codex provides the second opinion; Claude validates every finding against the real code before applying it.
 
-> Community plugin. Not affiliated with OpenAI or Anthropic. Needs the [`codex`](https://github.com/openai/codex) CLI installed and authenticated (`codex login`), plus Node.js.
-
 v1 grills **plans**. Code review, PR review, and design-doc commands are next.
 
 ---
@@ -105,3 +103,5 @@ Each `result-iter<N>.json` additionally records `resumePromptMode` (`"diff"` | `
 ## License
 
 [MIT](./LICENSE). Runtime dependency on the [Codex CLI](https://github.com/openai/codex) — not redistributed; see [`NOTICE`](./NOTICE).
+
+> Community plugin. Not affiliated with OpenAI or Anthropic. Needs the [`codex`](https://github.com/openai/codex) CLI installed and authenticated (`codex login`), plus Node.js.
