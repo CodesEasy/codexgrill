@@ -68,26 +68,24 @@ Halt. Do **not** edit the plan. Do **not** call `ExitPlanMode`. Wait for the use
 - **User says yes (they edited / it was their IDE):** acknowledge ("OK — leaving things as they are"). Then, **if the changed file looks like auto-generated noise that's currently tracked** (e.g., `.idea/*.iml`, build artifacts, framework caches — anything the user wouldn't intentionally edit), ask: "Want me to add `<file>` to `.gitignore` so this check doesn't trip on it again? Only say yes if it's truly auto-generated — committing it might be intentional." If yes, append the path (or a sensible pattern like `<dir>/`) to the project's root `.gitignore`. Then stop — user can re-invoke when ready.
 - **User says no / "it must be Codex":** say:
   > Then this looks like Codex breaking the read-only contract. What would you like me to do?
-  > - **Revert** the working tree to the content state from before this run started. This restores file contents; files that were originally untracked will appear as staged additions afterward (a known limitation of the snapshot format — your `git status` will look slightly different from before, but every file's bytes will match).
+  > - **Revert** the working tree to the content state from before this run. Originally-untracked files re-appear as staged additions (bytes match, `git status` will look different).
   > - **Stop** the run and leave the changes in place so you can inspect.
 
-  If the user accepts revert, dispatch on `preIterStash`:
+  If the user accepts revert, dispatch on `preIterStash` (all branches are destructive — confirm with the user before running, then verify with `git status` after):
 
-  - `preIterStash.isEmpty === false` (snapshot exists — with or without HEAD): run
+  - `preIterStash.isEmpty === false` (snapshot exists, with or without HEAD):
     ```bash
     git restore --source=<preIterStash.hash> --staged --worktree -- :/
     git clean -fd
     ```
-    Both are destructive on the current working tree. Ask the user to confirm before running, then verify with `git status` after.
 
-  - `preIterStash.isEmpty === true` and `preIterStash.noHead === false` (clean tree before the run, HEAD exists): no snapshot was built. Restore from HEAD:
+  - `preIterStash.isEmpty === true && noHead === false` (clean pre-run tree, HEAD exists): restore from HEAD.
     ```bash
     git restore --source=HEAD --staged --worktree -- :/
     git clean -fd
     ```
-    Both destructive — confirm first.
 
-  - `preIterStash.isEmpty === true` and `preIterStash.noHead === true` (fresh repo with no commits and an empty pre-run tree): there's no prior content to bring back. `git clean -fd` is the full revert; ask the user to confirm.
+  - `preIterStash.isEmpty === true && noHead === true` (fresh repo, empty pre-run tree): `git clean -fd` only — no prior content to restore.
 
 ### 5. Print Codex's review
 
