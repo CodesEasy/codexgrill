@@ -53,7 +53,9 @@ Same as `commands/security-once.md` Phase 1: read scopes, read dependency manife
 
 Print a heading `## Iteration <i>` and run these steps:
 
-### A. Invoke the wrapper
+### A. Invoke the wrapper (REQUIRED every iteration, do not skip)
+
+**You MUST run the wrapper each iteration.** Skipping it leaves you with Claude's first-pass plan only, defeating the whole loop. **Plan mode is fine** — the wrapper is read-only by construction (SHA256 hashes the working tree and `PLAN_PATH` before and after Codex runs; exits 2 if anything changed). The Bash invocation below is safe in any mode.
 
 **Iteration 1** (fresh thread — must NOT use `--ephemeral`; persistence is required for iter 2's resume):
 
@@ -187,6 +189,8 @@ Before deciding "clean", state the strongest reason it might NOT be — if real,
 If `i == MAX_ITERS` and step H didn't exit: stop the loop. Print `### ⏸ Did not converge in <MAX_ITERS> rounds`. Show Codex's last review and your last validation as a summary. Tell the user: "Cap reached. Latest plan is at `<PLAN_PATH>`. Run artifacts in `<RUN_DIR>`. Waiting for your instruction — bump `--max`, edit manually, or accept as-is." Do not call `ExitPlanMode`.
 
 ## Finalization
+
+**Self-check before finalizing:** Confirm at least one iteration's wrapper invocation (step A) actually ran. If you skipped the wrapper in every iteration — for any reason, including plan-mode caution about Bash — **stop and go back to iter 1's step A now**. Presenting Claude's first-pass plan without any Codex validation is not the contract of this skill.
 
 Tell the user where artifacts live (`<RUN_DIR>`). Then run a final Claude validation pass — re-verify every claim, code citation, version, file path, and external fact in `PLAN_PATH` against reality (heavier than per-iter validation; use parallel `Agent` calls for cross-file claims and `WebSearch` / `WebFetch` for external facts). Under `### Final Claude validation`, list what you checked. If anything is wrong, ambiguous, or missing — even something Codex blessed — do **not** call `ExitPlanMode` or `AskUserQuestion`; print the issue and wait.
 

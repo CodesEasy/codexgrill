@@ -115,7 +115,11 @@ Read the codebase within `SCOPES` and write a structured findings file at `PLAN_
 
 Omit any section that has no entries. If the audit produces zero findings overall, still write the file with an "## Summary" block stating 0 / 0 / 0 / 0 / 0 and a one-line "No issues found" note — this signals the empty-audit branch in Phase 4.
 
-### 4. Phase 2 — Codex validation
+### 4. Phase 2 — Codex validation (REQUIRED, do not skip)
+
+**You MUST invoke the wrapper. Skipping this step defeats the entire skill — without Codex's adversarial validation, you have only Claude's first pass, which is exactly what this skill exists to second-opinion.** Phase 4's `ExitPlanMode` / go-ahead prompt only runs *after* this validation completes.
+
+**Plan mode is fine.** The wrapper is read-only by construction: it computes a SHA256 hash of the working tree and of `PLAN_PATH` before and after Codex runs, and exits with code 2 (rejecting the run) if anything changed. The Bash invocation below is safe to execute in plan mode — equivalent to running a read-only script.
 
 Invoke the wrapper. `--scope` is repeatable — one instance per path in `SCOPES`:
 
@@ -206,6 +210,8 @@ Then under `#### What Codex missed`, do an independent fresh-eyes pass.
 - Plan file stays clean of plugin metadata (run IDs, validation state) — those live in `$RUN_DIR` and chat.
 
 ### 9. Phase 4 — Present
+
+**Self-check before presenting:** Confirm that Phase 2 (step 4) actually ran the wrapper and Phase 3 (step 7) validated Codex's response. If you skipped Phase 2 — for any reason, including plan-mode caution about Bash — **stop and go back to step 4 now**. Presenting Claude's first-pass plan without Codex validation is not the contract of this skill, and the user will get the wrong deliverable. The wrapper is read-only and safe to invoke in any mode.
 
 **Empty-audit branch (handle first):** If `PLAN_PATH` has zero findings (Critical + High + Medium + Low + Info all zero) after Phase 3, skip the "should I proceed with fixes" prompt entirely. Print:
 
