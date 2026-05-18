@@ -44,13 +44,20 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
 
 `--ephemeral` skips codex session persistence (once-mode only).
 
+**How to wait for completion.** Launch the wrapper with `run_in_background: true`. The system will notify you when the background command exits — that notification is the **only** authoritative "done" signal. Do **not**:
+- start a Monitor on the wrapper's stderr to check whether it's "done" — the wrapper streams progress lines (e.g. `[codex] $ <command>`, `[codex] ✗ tool returned code N`, `[codex] » <message>`) that describe Codex's internal activity, not wrapper status;
+- read `result.json` / `final.txt` / `codex.jsonl` before the completion notification — they are written incrementally or only-on-exit; the `result.json` file does not exist until the wrapper finishes, and absence of `turn.completed` mid-stream is not failure;
+- infer context-window exhaustion (or any other cause) from stderr volume, JSONL length, or prompt size while the wrapper is still running.
+
+When the notification arrives, branch on the background command's exit code per the table below. For diagnosis details, read `$RUN_DIR/result.json` — its `errorReason` field is the authoritative Codex error, parsed from the JSONL `turn.failed` / `error` events.
+
 ### 4. Handle the exit code
 
 - **0** — continue to step 5.
 - **2** — working-tree changed during the run. See "Exit 2 — working-tree changed" below.
 - **3** — codex CLI not installed. Tell the user: `npm install -g @openai/codex`, then `codex login`. Stop.
 - **4** — not a git working tree. Tell the user to `git init` here or `cd` into the repo. Stop. Do **not** call `ExitPlanMode`.
-- **1** — codex exec failed. Read stderr + `$RUN_DIR/result.json`. Common: `error.message` contains "context window" → suggest `--effort=high` (often triggered by `model_reasoning_effort = "xhigh"` in `~/.codex/config.toml`); auth / rate-limit → print verbatim and halt; otherwise print raw error and ask the user how to proceed. Never auto-retry.
+- **1** — codex exec failed. Read `$RUN_DIR/result.json` and quote its `errorReason` field verbatim — that is Codex's own error message (parsed from the JSONL `turn.failed` / `error` events) and the authoritative diagnosis. Do not infer the cause from stderr text, stream length, or prompt size. If `errorReason` literally contains `context window`, then (and only then) suggest `--effort=high` (often triggered by `model_reasoning_effort = "xhigh"` in `~/.codex/config.toml`). For auth or rate-limit messages, print verbatim and halt. Otherwise print the raw `errorReason` and ask the user how to proceed. Never auto-retry.
 - **64** — wrapper rejected the call. Print stderr verbatim. Fix the arg if user-supplied, else it's a plugin wiring bug.
 
 #### Exit 2 — working-tree changed

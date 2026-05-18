@@ -219,7 +219,7 @@ function summarizeEvent(evt) {
     }
     if (it.type === 'command_execution') {
       const code = it.exit_code ?? it.exitCode;
-      if (code != null && code !== 0) return `[codex] ✗ command (exit ${code})`;
+      if (code != null && code !== 0) return `[codex] ✗ tool returned code ${code}`;
       return null;
     }
     return null;

@@ -85,13 +85,20 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/security-audit.mjs" \
 
 Omit `--refuted-log` for iter 2 if no refutations exist yet — the wrapper treats a missing path as empty.
 
+**How to wait for completion.** Launch the wrapper with `run_in_background: true`. The system will notify you when the background command exits — that notification is the **only** authoritative "done" signal. Do **not**:
+- start a Monitor on the wrapper's stderr to check whether it's "done" — the wrapper streams progress lines (e.g. `[codex] $ <command>`, `[codex] ✗ tool returned code N`, `[codex] » <message>`) that describe Codex's internal activity, not wrapper status;
+- read `result-iter<i>.json` / `final-iter<i>.txt` / `codex-iter<i>.jsonl` before the completion notification — they are written incrementally or only-on-exit; the `result-iter<i>.json` file does not exist until the wrapper finishes, and absence of `turn.completed` mid-stream is not failure;
+- infer context-window exhaustion (or any other cause) from stderr volume, JSONL length, or prompt size while the wrapper is still running.
+
+When the notification arrives, branch on the background command's exit code per the table below. For diagnosis details, read `$RUN_DIR/result-iter<i>.json` — its `errorReason` field is the authoritative Codex error, parsed from the JSONL `turn.failed` / `error` events.
+
 ### B. Branch on the exit code
 
 - **0** — continue to step C.
 - **2** — working-tree changed. See "Exit 2 — working-tree changed" below.
 - **3** — codex CLI not installed. Tell the user: `npm install -g @openai/codex`, then `codex login`. Stop.
 - **4** — not a git working tree. Tell the user to `git init` or `cd` into the repo. Stop. Do not call `ExitPlanMode`.
-- **1** — codex exec failed. Read stderr + `$RUN_DIR/result-iter<i>.json`. Common: "context window" → suggest `--effort=high`; auth / rate-limit → halt with verbatim message; otherwise halt with exact error. Never auto-retry and never silently fall back to `--mode fresh`.
+- **1** — codex exec failed. Read `$RUN_DIR/result-iter<i>.json` and quote its `errorReason` field verbatim — that is Codex's own error message (parsed from the JSONL `turn.failed` / `error` events) and the authoritative diagnosis. Do not infer the cause from stderr text, stream length, or prompt size. If `errorReason` literally contains `context window`, then (and only then) suggest `--effort=high`. For auth or rate-limit messages, halt with the verbatim text. Otherwise halt with the exact `errorReason`. Never auto-retry and never silently fall back to `--mode fresh`.
 - **64** — wrapper rejected the call. Print stderr verbatim. Fix the arg if user-supplied, else it's a plugin wiring bug.
 
 #### Exit 2 — working-tree changed
