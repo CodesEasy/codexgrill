@@ -1,12 +1,12 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "codexgrill",
-  "description": "Adversarial plan review for Claude Code — Codex grills, Claude validates.",
+  "description": "Adversarial plan review and security audits for Claude Code — Codex grills, Claude validates.",
   "owner": { "name": "codeseasy" },
   "plugins": [
     {
       "name": "codexgrill",
-      "description": "Adversarial plan review via codex exec. Claude validates every finding against real code.",
+      "description": "Adversarial plan review and security audits via codex exec. Claude validates every finding against real code.",
       "author": { "name": "codeseasy" },
       "category": "development",
       "source": "./",

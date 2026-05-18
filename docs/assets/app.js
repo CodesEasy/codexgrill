@@ -5,8 +5,9 @@
 // 4) nav scrolled state
 // 5) copy-to-clipboard on code blocks
 // 6) tabbed command panels
-// 7) active-section highlighting in nav
-// 8) year stamp
+// 7) active-section highlighting in nav (same-page hash anchors)
+// 8) active-page highlighting in nav (cross-page links: index/plan/security)
+// 9) year stamp
 
 (function () {
   'use strict';
@@ -183,6 +184,26 @@
 
     sections.forEach((s) => io.observe(s));
   }
+
+  // ---------- active-page highlight (cross-page nav links) ----------
+  // Each top-nav cross-page link carries a `data-nav` attribute (e.g.
+  // `data-nav="plan"`). We resolve the current page from window.location
+  // and toggle `.active-page` on the matching link. Same-page hash anchors
+  // are handled separately by the IntersectionObserver above.
+  (function () {
+    const pathname = (window.location.pathname || '/').toLowerCase();
+    let pageKey = 'index';
+    if (pathname.endsWith('/plan.html') || pathname === '/plan') pageKey = 'plan';
+    else if (pathname.endsWith('/security.html') || pathname === '/security') pageKey = 'security';
+    else if (pathname === '/' || pathname.endsWith('/index.html')) pageKey = 'index';
+
+    document.querySelectorAll('.cg-nav-links a[data-nav]').forEach((a) => {
+      if (a.getAttribute('data-nav') === pageKey) {
+        a.classList.add('active-page');
+        a.setAttribute('aria-current', 'page');
+      }
+    });
+  })();
 
   // ---------- year stamp ----------
   const y = document.querySelector('[data-year]');

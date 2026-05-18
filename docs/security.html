@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#181614" />
+
+  <title>Security audit — codexgrill</title>
+  <meta name="description" content="Read-only security audit for your codebase. Claude reviews and writes a structured audit plan with CWE / CVE / GHSA refs; Codex validates and extends; Claude finalizes. Fixes only after your explicit go-ahead." />
+  <meta name="keywords" content="claude code, codex, security audit, vulnerability scanner, OWASP, CWE, CVE, GHSA, SAST, plan review, AI security review" />
+  <meta name="author" content="codeseasy" />
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1" />
+  <link rel="canonical" href="https://codexgrill.com/security.html" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://codexgrill.com/security.html" />
+  <meta property="og:site_name" content="codexgrill" />
+  <meta property="og:title" content="Security audit — codexgrill" />
+  <meta property="og:description" content="Read-only security audit. Claude reviews, Codex validates and extends, Claude finalizes. Fixes only after explicit go-ahead." />
+  <meta property="og:image" content="https://codexgrill.com/assets/og-image.png" />
+  <meta property="og:locale" content="en_US" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Security audit — codexgrill" />
+  <meta name="twitter:description" content="Read-only security audit for your codebase, with CWE / CVE / GHSA grounding." />
+  <meta name="twitter:image" content="https://codexgrill.com/assets/og-image.png" />
+
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23d97757'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h7' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23d97757'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h7' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="./assets/style.css" />
+</head>
+<body>
+
+<a href="#main" class="skip-link">Skip to main content</a>
+<div class="scroll-progress" aria-hidden="true"><span></span></div>
+
+<!-- NAV -->
+<nav class="cg-nav" id="nav">
+  <div class="container nav-row">
+    <a class="cg-brand" href="/" aria-label="codexgrill home">
+      <span class="cg-brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="22" height="22">
+          <rect width="32" height="32" rx="7" fill="currentColor"/>
+          <path d="M9 11h14M9 16h10M9 21h7" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </span>
+      <span class="cg-brand-name">codexgrill</span>
+      <span class="cg-brand-version">v1.1.0</span>
+    </a>
+
+    <ul class="cg-nav-links" id="nav-links">
+      <li><a href="/" data-nav="index">Home</a></li>
+      <li><a href="/plan.html" data-nav="plan">Plan validation</a></li>
+      <li><a href="/security.html" data-nav="security">Security audit</a></li>
+      <li><a href="/#install">Install</a></li>
+      <li><a href="/#exit-codes">Exit codes</a></li>
+    </ul>
+
+    <div class="cg-nav-actions">
+      <a class="btn-ghost btn-sm" href="https://github.com/codeseasy/codexgrill" target="_blank" rel="noopener" aria-label="View source on GitHub">
+        <i class="bi bi-github" aria-hidden="true"></i>
+        <span class="hide-sm">GitHub</span>
+      </a>
+      <button class="icon-btn" data-theme-toggle aria-label="Toggle theme">
+        <i class="bi bi-sun-fill icon-sun" aria-hidden="true"></i>
+        <i class="bi bi-moon-stars-fill icon-moon" aria-hidden="true"></i>
+      </button>
+      <button class="icon-btn nav-menu-btn" id="nav-menu-btn" aria-label="Toggle menu" aria-expanded="false" aria-controls="nav-links">
+        <i class="bi bi-list icon-open" aria-hidden="true"></i>
+        <i class="bi bi-x-lg icon-close" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<main id="main">
+
+<!-- HERO -->
+<header id="top" class="hero" aria-labelledby="hero-title">
+  <div class="hero-bg" aria-hidden="true">
+    <div class="hero-glow"></div>
+    <div class="hero-grid"></div>
+  </div>
+
+  <div class="container">
+    <div class="hero-text" style="max-width: 780px;">
+      <span class="hero-badge">
+        <span class="dot" aria-hidden="true"></span>
+        <span>Security audit flow</span>
+      </span>
+      <h1 class="hero-title" id="hero-title">
+        Audit your codebase
+        <span class="accent-line">read-only, <span class="accent">CWE-grounded</span></span>
+      </h1>
+      <p class="hero-sub">
+        Claude reads the codebase and dependency manifests, writes a structured security audit plan with CWE,
+        CVE, and GHSA references. Codex validates each finding and surfaces what Claude missed. Claude finalizes.
+        Fixes only happen after your <em>explicit</em> go-ahead.
+      </p>
+      <div class="hero-cta">
+        <a class="btn-primary" href="#usage">
+          <span>Show me the commands</span>
+          <i class="bi bi-arrow-right" aria-hidden="true"></i>
+        </a>
+        <a class="btn-ghost" href="#how-it-works">
+          <span>How it works</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- USAGE -->
+<section id="usage" class="section" aria-labelledby="usage-title">
+  <div class="container">
+    <div class="section-head">
+      <span class="section-eyebrow">01 · Daily use</span>
+      <h2 class="section-title" id="usage-title"><a class="section-anchor" href="#usage">Usage</a></h2>
+      <p class="section-lead">
+        Audit scope is <strong>optional</strong>. With no path arg, codexgrill audits the whole repo.
+        Pass one or more paths to scope.
+      </p>
+    </div>
+
+    <div class="cg-tabs" data-tabs="commands" role="tablist">
+      <button class="cg-tab-btn active" data-tab-target="once" role="tab" aria-selected="true">/codexgrill:security-once</button>
+      <button class="cg-tab-btn" data-tab-target="loop" role="tab" aria-selected="false">/codexgrill:security-loop</button>
+    </div>
+
+    <div data-tabs-panel-group="commands">
+      <div class="cg-tab-panel active" data-tabs-panel="once" role="tabpanel">
+        <p class="muted">
+          <strong>One pass.</strong> Claude reviews the codebase, writes the audit plan, Codex validates and extends,
+          Claude finalizes, presents via <code>ExitPlanMode</code> (or asks for go-ahead before applying fixes).
+        </p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="lang">claude code</span>
+            <button class="copy-btn" type="button"><i class="bi bi-clipboard" aria-hidden="true"></i><span class="copy-label">Copy</span></button>
+          </div>
+<pre><code>/codexgrill:security-once                       <span class="cmt"># whole repo</span>
+/codexgrill:security-once src/auth              <span class="cmt"># scope to one path</span>
+/codexgrill:security-once src/auth src/billing  <span class="cmt"># multiple paths</span>
+/codexgrill:security-once src/auth --effort=high<span class="cmt"># paths + flags</span>
+/codexgrill:security-once --model=gpt-5.4       <span class="cmt"># override model</span></code></pre>
+        </div>
+        <p class="dim small">
+          Also reachable via the router: <code>/codexgrill:once</code> → pick "Security audit".
+          The plan file is written to <code>.claude/plans/security-audit-&lt;ts&gt;.md</code>.
+        </p>
+      </div>
+
+      <div class="cg-tab-panel" data-tabs-panel="loop" role="tabpanel">
+        <p class="muted">
+          <strong>Iterate until clean.</strong> Loops Codex review + Claude validation + plan edits until Codex says
+          <code>AUDIT CLEAN</code> and Claude finds nothing missed, or <code>--max</code> rounds run out.
+        </p>
+        <div class="code-block">
+          <div class="code-block-header">
+            <span class="lang">claude code</span>
+            <button class="copy-btn" type="button"><i class="bi bi-clipboard" aria-hidden="true"></i><span class="copy-label">Copy</span></button>
+          </div>
+<pre><code>/codexgrill:security-loop                       <span class="cmt"># whole repo</span>
+/codexgrill:security-loop src/auth              <span class="cmt"># scope to one path</span>
+/codexgrill:security-loop --max=10              <span class="cmt"># bump the cap (default 7)</span>
+/codexgrill:security-loop --effort=xhigh        <span class="cmt"># override reasoning effort</span>
+/codexgrill:security-loop --model=gpt-5.4       <span class="cmt"># override model</span></code></pre>
+        </div>
+        <p class="dim small">
+          Pins Codex to one thread, sends unified diffs after iter 1. Same convergence rules as the plan loop —
+          both models must agree the audit is clean. Also reachable via the router: <code>/codexgrill:loop</code>
+          → pick "Security audit".
+        </p>
+      </div>
+    </div>
+
+    <h3 class="h-sub mt-xl">What you'll see in chat</h3>
+    <div class="see-grid">
+      <div class="see-card">
+        <span class="see-num">01</span>
+        <strong>Claude's initial security review</strong>
+        <p>Claude reads the codebase + dependency manifests, queries advisory sources (GHSA, NVD), writes the audit plan to <code>.claude/plans/security-audit-&lt;ts&gt;.md</code>.</p>
+      </div>
+      <div class="see-card">
+        <span class="see-num">02</span>
+        <strong>Codex's verdict + validation</strong>
+        <p>Verbatim. First-line verdict (<em>AUDIT CLEAN</em> / <em>NEEDS REVISION</em> / <em>CRITICAL ISSUES</em>), then per-finding <em>CONFIRMED</em> / <em>REFUTED</em> / <em>EXTENDED</em>, plus any new findings Claude missed.</p>
+      </div>
+      <div class="see-card">
+        <span class="see-num">03</span>
+        <strong>Claude's per-finding validation</strong>
+        <p>Claude re-reads each cited file. Codex's findings get <em>CONFIRMED</em> / <em>REFUTED</em> / <em>UNVERIFIABLE</em>. UNVERIFIABLE → flagged in chat.</p>
+      </div>
+      <div class="see-card">
+        <span class="see-num">04</span>
+        <strong>Final plan + go-ahead prompt</strong>
+        <p>In plan mode: <code>ExitPlanMode</code> with the audit. Otherwise: "Review the plan. Should I proceed with the fixes?" Fixes only run after explicit yes.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how-it-works" class="section section-alt" aria-labelledby="hiw-title">
+  <div class="container">
+    <div class="section-head">
+      <span class="section-eyebrow">02 · Under the hood</span>
+      <h2 class="section-title" id="hiw-title"><a class="section-anchor" href="#how-it-works">How it works</a></h2>
+      <p class="section-lead">
+        Four phases. Claude does the first review (no Codex yet); Codex validates and extends; Claude finalizes;
+        the user gets the final call on fixes.
+      </p>
+    </div>
+
+    <ol class="flow">
+      <li class="flow-step">
+        <span class="step-num">1</span>
+        <div class="step-body">
+          <h4>Claude reviews the codebase</h4>
+          <p>Claude reads the scoped files, dependency manifests (<code>package.json</code>, <code>requirements.txt</code>, <code>go.mod</code>, etc.), and runs <code>WebSearch</code> / <code>WebFetch</code> against authoritative advisory sources (GHSA, NVD, vendor advisories). Categories: injection, auth flaws, broken access control, crypto failures, hardcoded secrets, SSRF, path traversal, deserialization, XSS, CSRF, race conditions, missing security headers, vulnerable dependencies, CORS misconfig, more — all anchored to OWASP Top 10 + CWE.</p>
+        </div>
+      </li>
+      <li class="flow-step">
+        <span class="step-num">2</span>
+        <div class="step-body">
+          <h4>Codex validates and extends</h4>
+          <p>The wrapper sends Claude's plan to <code>codex exec</code> with a validate-and-extend prompt. Codex checks each finding against the actual code, marks it <em>CONFIRMED</em> / <em>REFUTED</em> / <em>EXTENDED</em>, and adds <em>NEW</em> findings Claude missed. All grounded in <code>path:line</code> citations and primary-source CVE/GHSA links.</p>
+        </div>
+      </li>
+      <li class="flow-step">
+        <span class="step-num">3</span>
+        <div class="step-body">
+          <h4>Claude validates Codex's response</h4>
+          <p>For every finding Codex returns (validation + new), Claude invokes <code>Read</code> on the cited file. Codex's verdict gets <em>CONFIRMED</em> / <em>REFUTED</em> / <em>UNVERIFIABLE</em> by Claude. No memory shortcuts. External claims hit primary sources via <code>WebSearch</code>/<code>WebFetch</code>.</p>
+        </div>
+      </li>
+      <li class="flow-step">
+        <span class="step-num">4</span>
+        <div class="step-body">
+          <h4>The audit plan is updated</h4>
+          <p>CONFIRMED findings stay in the plan with concrete fix recommendations. REFUTED ones are dropped. UNVERIFIABLE items flagged. In <code>security-loop</code> mode this repeats with a pinned Codex thread until both models agree the audit is clean (Codex says <em>AUDIT CLEAN</em> + Claude finds nothing missed).</p>
+        </div>
+      </li>
+      <li class="flow-step">
+        <span class="step-num">5</span>
+        <div class="step-body">
+          <h4>Present — and only fix on go-ahead</h4>
+          <p>In <strong>plan mode</strong>: <code>ExitPlanMode</code> with the audit. You approve through the normal plan-mode UX. In <strong>normal chat</strong>: Claude asks "Review the plan. Should I proceed with the fixes, or do you want to make changes first?" Fixes only happen after an explicit yes — never auto-applied. When the audit is empty (zero findings), the "should I proceed?" prompt is skipped entirely.</p>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- FINDINGS FORMAT -->
+<section id="findings-format" class="section">
+  <div class="container">
+    <div class="section-head">
+      <span class="section-eyebrow">03 · What you get</span>
+      <h2 class="section-title"><a class="section-anchor" href="#findings-format">Findings format</a></h2>
+      <p class="section-lead">
+        The audit plan file at <code>.claude/plans/security-audit-&lt;ts&gt;.md</code> follows a strict structure
+        — copy-pasteable fixes, CWE refs, primary-source advisory links.
+      </p>
+    </div>
+
+    <h3 class="h-sub">Severity scheme</h3>
+    <p class="muted">
+      Findings are tagged <strong>Critical / High / Medium / Low / Info</strong> + a CWE category reference.
+      We don't compute CVSS for in-code findings (CVSS requires environment context the auditor doesn't have —
+      "is this internet-facing? does the user already have auth?"). CVSS scores are quoted only when they come
+      from an upstream CVE / GHSA advisory.
+    </p>
+
+    <h3 class="h-sub mt-xl">Sample finding</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="lang">.claude/plans/security-audit-&lt;ts&gt;.md</span>
+        <button class="copy-btn" type="button"><i class="bi bi-clipboard" aria-hidden="true"></i><span class="copy-label">Copy</span></button>
+      </div>
+<pre><code><span class="cmt">### [CRITICAL] Hardcoded API key in source</span>
+- **CWE**: CWE-798 ([Hardcoded Credentials](https://cwe.mitre.org/data/definitions/798.html))
+- **Location**: `src/auth/client.ts:42`
+- **Evidence**:
+  ```ts
+  const STRIPE_KEY = "sk_live_REDACTED_EXAMPLE";
+  ```
+- **Why it's vulnerable**: Live secret committed to source. Anyone with repo
+  read access (employees, contractors, leaks) can drain the account.
+- **Recommended fix**:
+  ```ts
+  const STRIPE_KEY = process.env.STRIPE_SECRET_KEY;
+  if (!STRIPE_KEY) throw new Error("STRIPE_SECRET_KEY required");
+  ```
+- **References**:
+  - [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html)
+  - Rotate the key immediately at https://dashboard.stripe.com/apikeys</code></pre>
+    </div>
+
+    <h3 class="h-sub mt-xl">Sample dependency finding</h3>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="lang">.claude/plans/security-audit-&lt;ts&gt;.md</span>
+        <button class="copy-btn" type="button"><i class="bi bi-clipboard" aria-hidden="true"></i><span class="copy-label">Copy</span></button>
+      </div>
+<pre><code><span class="cmt">### [HIGH] express@4.17.1 — CVE-2024-29041</span>
+- **Severity**: GHSA: Moderate, CVSS 6.1
+- **Advisory**: [GHSA-rv95-896h-c2vc](https://github.com/advisories/GHSA-rv95-896h-c2vc)
+- **Fixed in**: 4.19.2
+- **Recommended action**: bump to `^4.19.2` and run `npm audit`.</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- SAFETY -->
+<section id="safety" class="section section-alt" aria-labelledby="safety-title">
+  <div class="container">
+    <div class="section-head">
+      <span class="section-eyebrow">04 · Safety contract</span>
+      <h2 class="section-title" id="safety-title"><a class="section-anchor" href="#safety">Containment &amp; revert</a></h2>
+      <p class="section-lead">
+        The security wrapper enforces read-only with the same mechanisms as the plan flow,
+        <em>plus</em> one extra check specifically for the audit plan file.
+      </p>
+    </div>
+
+    <div class="safety-grid">
+      <div class="feature-card">
+        <span class="icon-pill"><i class="bi bi-fingerprint" aria-hidden="true"></i></span>
+        <h3>1. SHA256 working-tree containment</h3>
+        <p>The wrapper hashes every Git-visible dirty + untracked path before and after every Codex call. Any change → exit <code>2</code> (<code>WORKING_TREE_CHANGED</code>), loop halts, you decide.</p>
+      </div>
+      <div class="feature-card">
+        <span class="icon-pill"><i class="bi bi-file-earmark-lock2" aria-hidden="true"></i></span>
+        <h3>2. Explicit plan-file SHA256</h3>
+        <p>The audit plan lives at <code>.claude/plans/security-audit-&lt;ts&gt;.md</code>, which is under <strong>gitignored</strong> <code>.claude/</code>. The git-status snapshot wouldn't see mutations there — so the security wrapper hashes the plan file directly, pre and post. Any change → exit <code>2</code> with the plan path in <code>changedFiles</code>.</p>
+      </div>
+      <div class="feature-card">
+        <span class="icon-pill"><i class="bi bi-file-lock" aria-hidden="true"></i></span>
+        <h3>3. Prompt-level read-only contract</h3>
+        <p>The audit prompt's <code>&lt;action_safety&gt;</code> block explicitly tells Codex any modification — including to the plan file — will cause the run to be REJECTED.</p>
+      </div>
+      <div class="feature-card">
+        <span class="icon-pill"><i class="bi bi-hand-thumbs-up" aria-hidden="true"></i></span>
+        <h3>4. User approval before fixes</h3>
+        <p>The plugin never auto-fixes. Either <code>ExitPlanMode</code> hands the audit to the user (plan mode), or Claude asks explicitly: "Should I proceed with the fixes?" No fix runs without an explicit yes.</p>
+      </div>
+    </div>
+
+    <h3 class="h-sub mt-xl">Revert safety net</h3>
+    <p class="muted">
+      Same as the plan flow: each iteration builds a content snapshot pinned under
+      <code>refs/codexgrill/&lt;run-id&gt;/iter-&lt;N&gt;-pre</code>. Revert with:
+    </p>
+    <div class="code-block">
+      <div class="code-block-header">
+        <span class="lang">bash</span>
+        <button class="copy-btn" type="button"><i class="bi bi-clipboard" aria-hidden="true"></i><span class="copy-label">Copy</span></button>
+      </div>
+<pre><code>git restore --source=&lt;preIterStash.hash&gt; --staged --worktree -- :/
+git clean -fd</code></pre>
+    </div>
+    <div class="callout">
+      <h5>One thing the revert does NOT cover</h5>
+      <p>The audit plan file at <code>.claude/plans/security-audit-&lt;ts&gt;.md</code> is gitignored, so a working-tree revert does not restore its contents. The pre/post hash check still <em>detects</em> mutations to the plan file (and you can see the changed bytes), but recovering the prior plan body means re-running the audit or restoring from a separate backup.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ARTIFACTS -->
+<section id="artifacts" class="section">
+  <div class="container">
+    <div class="section-head">
+      <span class="section-eyebrow">05 · Reference</span>
+      <h2 class="section-title"><a class="section-anchor" href="#artifacts">Run artifacts</a></h2>
+      <p class="section-lead">
+        Every run drops artifacts under <code>.claude/temp/codexgrill/&lt;run-id&gt;/</code> (gitignored).
+        The audit plan itself lives at <code>.claude/plans/security-audit-&lt;unix-secs&gt;.md</code>.
+      </p>
+    </div>
+
+    <h3 class="h-sub"><code>security-once</code> runs</h3>
+    <div class="table-wrap">
+      <table class="cg-table">
+        <thead><tr><th>file</th><th>description</th></tr></thead>
+        <tbody>
+          <tr><td><code>prompt.txt</code></td><td>Exact prompt sent to Codex.</td></tr>
+          <tr><td><code>final.txt</code></td><td>Codex's final validation message.</td></tr>
+          <tr><td><code>codex.jsonl</code></td><td>Full JSONL event stream from <code>codex exec</code>.</td></tr>
+          <tr><td><code>result.json</code></td><td>Wrapper summary — thread_id, exit_code, token usage, paths, preIterStash hash, plus <code>planHashBefore</code> / <code>planHashAfter</code> / <code>planFileChanged</code> for the plan-file containment check.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="h-sub mt-xl"><code>security-loop</code> runs</h3>
+    <p class="muted">Each artifact above gets an <code>-iter&lt;N&gt;</code> suffix, plus:</p>
+    <div class="table-wrap">
+      <table class="cg-table">
+        <thead><tr><th>file</th><th>description</th></tr></thead>
+        <tbody>
+          <tr><td><code>state.json</code></td><td>Run state — pinned <code>codex_thread_id</code>, <code>audit_scope</code>, per-iter verdicts, validation counts.</td></tr>
+          <tr><td><code>refuted-log.txt</code></td><td>Cumulative refutations, prepended to each iteration's prompt.</td></tr>
+          <tr><td><code>plan-snapshot-iter&lt;N&gt;.md</code></td><td>Verbatim copy of the audit plan sent to Codex in iter N. Baseline for iter N+1's diff.</td></tr>
+          <tr><td><code>plan-diff-iter&lt;N&gt;.diff</code></td><td>Unified diff of audit-plan changes vs the prior iter's snapshot.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- TUNING -->
+<section id="tuning" class="section section-alt">
+  <div class="container">
+    <div class="section-head">
+      <span class="section-eyebrow">06 · Reference</span>
+      <h2 class="section-title"><a class="section-anchor" href="#tuning">Tuning for large audits</a></h2>
+      <p class="section-lead">
+        <code>codex exec</code> has no auto-compaction — a single audit turn that overruns the per-turn context window
+        aborts with an error instead of retrying. Security audits over a whole repo are particularly prone to this.
+        If you see &quot;Codex ran out of room in the model's context window&quot;:
+      </p>
+    </div>
+
+    <ul class="check-list">
+      <li><i class="bi bi-arrow-right-short" aria-hidden="true"></i><div>The most common cause is <code>model_reasoning_effort = "xhigh"</code> in <code>~/.codex/config.toml</code>. Reasoning tokens count toward the per-turn budget.</div></li>
+      <li><i class="bi bi-arrow-right-short" aria-hidden="true"></i><div>Pass <code>--effort=high</code> to override the config for this run only (one notch below <code>xhigh</code> — usually frees enough context without giving up reasoning depth). Valid levels: <code>none</code>, <code>minimal</code>, <code>low</code>, <code>medium</code>, <code>high</code>, <code>xhigh</code>.</div></li>
+      <li><i class="bi bi-arrow-right-short" aria-hidden="true"></i><div>Or narrow the scope: pass explicit <code>--scope</code> paths instead of running on the whole repo. Audits scale roughly with the size of the audited source.</div></li>
+    </ul>
+
+    <div class="callout">
+      <h5>No silent retries</h5>
+      <p>The plugin never auto-retries on context exhaustion or rate-limit errors. It surfaces the diagnostic and waits for your call. No surprise extra spending.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section section-cta" aria-label="Try plan validation">
+  <div class="container">
+    <div class="cta-card">
+      <h2>Want to grill a plan instead?</h2>
+      <p>codexgrill also reviews implementation plans before you write the code. Same safety contract, same convergence rules.</p>
+      <div class="hero-cta">
+        <a class="btn-primary" href="/plan.html">
+          <i class="bi bi-clipboard-check" aria-hidden="true"></i>
+          <span>Plan validation docs</span>
+        </a>
+        <a class="btn-ghost" href="/">
+          <i class="bi bi-house" aria-hidden="true"></i>
+          <span>Back to home</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="cg-footer" role="contentinfo">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <div class="cg-brand">
+          <span class="cg-brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="22" height="22">
+              <rect width="32" height="32" rx="7" fill="currentColor"/>
+              <path d="M9 11h14M9 16h10M9 21h7" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="cg-brand-name">codexgrill</span>
+        </div>
+        <p class="muted">
+          Adversarial plan review and security audits for Claude Code. Built with the
+          <a href="https://github.com/openai/codex" target="_blank" rel="noopener">Codex CLI</a> as the second opinion.
+        </p>
+      </div>
+      <div class="footer-col">
+        <strong>Links</strong>
+        <ul>
+          <li><a href="https://github.com/codeseasy/codexgrill" target="_blank" rel="noopener">GitHub repository</a></li>
+          <li><a href="https://github.com/codeseasy/codexgrill/issues" target="_blank" rel="noopener">Report an issue</a></li>
+          <li><a href="https://github.com/openai/codex" target="_blank" rel="noopener">Codex CLI</a></li>
+        </ul>
+      </div>
+      <div class="footer-col">
+        <strong>Docs</strong>
+        <ul>
+          <li><a href="/plan.html">Plan validation</a></li>
+          <li><a href="/security.html">Security audit</a></li>
+          <li><a href="/#install">Install</a></li>
+          <li><a href="/#exit-codes">Exit codes</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-disclaimer">
+      <p>
+        © <span data-year>2026</span> codeseasy ·
+        <a href="https://github.com/codeseasy/codexgrill/blob/main/LICENSE" target="_blank" rel="noopener">MIT licensed</a> ·
+        Runtime dependency on the <a href="https://github.com/openai/codex" target="_blank" rel="noopener">Codex CLI</a> — not redistributed.
+      </p>
+      <p class="dim">
+        Community plugin. Not affiliated with OpenAI or Anthropic. Requires the
+        <code>codex</code> CLI installed and authenticated (<code>codex login</code>), plus Node.js.
+      </p>
+    </div>
+  </div>
+</footer>
+
+<script src="./assets/app.js"></script>
+</body>
+</html>

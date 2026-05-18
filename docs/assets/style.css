@@ -298,7 +298,8 @@ em {
   position: relative;
 }
 .cg-nav-links li a:hover { color: var(--fg-strong); background: var(--surface); }
-.cg-nav-links li a.active { color: var(--cg-orange); background: var(--cg-orange-glow); }
+.cg-nav-links li a.active,
+.cg-nav-links li a.active-page { color: var(--cg-orange); background: var(--cg-orange-glow); }
 
 .cg-nav-actions { display: inline-flex; align-items: center; gap: 0.45rem; margin-left: auto; }
 
@@ -690,6 +691,59 @@ em {
 @media (max-width: 520px) {
   .feature-card { padding: var(--space-5); }
 }
+
+/* ============================================================
+   FLOW CARDS (landing "Choose your flow" section)
+   ============================================================ */
+.flow-cards {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+@media (min-width: 820px) { .flow-cards { grid-template-columns: repeat(2, 1fr); } }
+
+.flow-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  transition: transform .25s var(--ease), border-color .25s var(--ease), box-shadow .25s var(--ease);
+}
+.flow-card:hover {
+  border-color: var(--cg-orange);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lift);
+}
+.flow-card > header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.flow-card h3 { margin: 0; font-size: 1.2rem; }
+.flow-card p { margin: 0; color: var(--fg-muted); font-size: 0.96rem; line-height: 1.65; }
+.flow-card-cmds {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.flow-card-cmds li {
+  font-size: 0.92rem;
+  color: var(--fg-muted);
+}
+.flow-card-cmds code {
+  color: var(--fg-strong);
+  background: var(--bg-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.flow-card .btn-primary { align-self: flex-start; }
 
 .icon-pill {
   width: 44px; height: 44px;

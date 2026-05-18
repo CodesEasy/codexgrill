@@ -1,7 +1,7 @@
 {
   "name": "codexgrill",
-  "version": "1.0.10",
-  "description": "Adversarial plan review for Claude Code. Codex (via codex exec) provides the second opinion; Claude validates every finding against real code before applying it.",
+  "version": "1.1.0",
+  "description": "Adversarial plan review and security audits for Claude Code. Codex (via codex exec) provides the second opinion; Claude validates every finding against real code before applying it.",
   "author": { "name": "codeseasy", "email": "mail@codeseasy.com" },
   "homepage": "https://codexgrill.com",
   "repository": "https://github.com/codeseasy/codexgrill",

@@ -1,121 +1,31 @@
 ---
-description: Grill a plan with Codex (read-only). Single pass, then validate.
-argument-hint: "[path/to/plan.md] [--effort=<level>] [--model=<name>]"
+description: Entry point for single-pass operations. Asks plan-validation vs security-audit, then dispatches to plan-once or security-once.
+argument-hint: "[args forwarded to the chosen sub-skill]"
 ---
 
-Send the plan to Codex for a strict read-only review, validate every finding against the real code, update the plan if needed, then re-present it via `ExitPlanMode`.
+Router skill. Asks the user which flow they want — plan validation or security audit — then dispatches to the corresponding single-pass sub-skill with all arguments forwarded.
 
 Raw arguments: `$ARGUMENTS`
 
 ## Steps
 
-### 1. Parse `$ARGUMENTS`
+### 1. Ask the user which flow to run
 
-- `--effort=<level>` → `EFFORT` (one of `none|minimal|low|medium|high|xhigh`). Default: omit.
-- `--model=<name>` → `MODEL`. Default: omit.
-- Anything else → the plan path (or empty).
+If the `AskUserQuestion` tool schema isn't loaded, fetch it via `ToolSearch` with `select:AskUserQuestion` first.
 
-### 2. Resolve `PLAN_PATH` and compute `RUN_DIR`
+Call `AskUserQuestion` with one question, two options:
 
-1. `UNIX_SECS = <current unix timestamp in seconds>`.
-2. Set `PLAN_SOURCE` and `PLAN_BASENAME`:
-   - **plan-path arg given** → `PLAN_SOURCE = arg`, `PLAN_BASENAME = <basename with .md stripped, non-alphanumeric → `-`>`.
-   - **no plan-path arg** → `PLAN_SOURCE = inline`, `PLAN_BASENAME = inline`.
-3. `RUN_ID = once-$UNIX_SECS-$PLAN_BASENAME`, `RUN_DIR = .claude/temp/codexgrill/$RUN_ID`.
-4. Resolve `PLAN_PATH`:
-   - `PLAN_SOURCE = arg` → `PLAN_PATH = <the arg>`.
-   - `PLAN_SOURCE = inline` → the session's `ExitPlanMode` plan is auto-saved to `~/.claude/plans/<auto-name>.md`. Copy it:
-     ```bash
-     node "${CLAUDE_PLUGIN_ROOT}/scripts/copy-plan.mjs" "<source-path>" "$RUN_DIR/plan.md"
-     ```
-     On exit 0 → `PLAN_PATH = $RUN_DIR/plan.md`. On non-zero / uncertain path → `Write` the most recent `ExitPlanMode` plan from this conversation **verbatim** to `$RUN_DIR/plan.md`, then `PLAN_PATH = $RUN_DIR/plan.md`. No plan in either source → stop and tell the user.
+- **Question**: "Which codexgrill flow do you want to run?"
+- **Header**: "Flow"
+- **Options**:
+  - **"Plan validation"** — "Grill a plan with Codex (read-only). Single pass, then validate every finding against the real code and re-present via ExitPlanMode. You need either a plan-path argument or an active plan-mode plan."
+  - **"Security audit"** — "Codex + Claude audit the codebase for vulnerabilities (read-only). Claude does the initial review, Codex validates and extends, produces a security plan file you can act on. Default scope is the whole repo; pass paths to scope."
 
-### 3. Run the wrapper
+### 2. Dispatch to the chosen sub-skill
 
-```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
-  --plan "<PLAN_PATH>" \
-  --run-dir "<RUN_DIR>" \
-  --mode fresh \
-  --iter 1 \
-  --ephemeral \
-  [--effort <EFFORT>] [--model <MODEL>]
-```
+Use the `Skill` tool. If its schema isn't loaded, fetch it via `ToolSearch` with `select:Skill` first.
 
-`--ephemeral` skips codex session persistence (once-mode only).
+- **User picked "Plan validation"** → call `Skill` with `skill = "codexgrill:plan-once"` and `args = "$ARGUMENTS"` (the original raw arguments, forwarded verbatim).
+- **User picked "Security audit"** → call `Skill` with `skill = "codexgrill:security-once"` and `args = "$ARGUMENTS"`.
 
-### 4. Handle the exit code
-
-- **0** — continue to step 5.
-- **2** — working-tree changed during the run. See "Exit 2 — working-tree changed" below.
-- **3** — codex CLI not installed. Tell the user: `npm install -g @openai/codex`, then `codex login`. Stop.
-- **4** — not a git working tree. Tell the user to `git init` here or `cd` into the repo. Stop. Do **not** call `ExitPlanMode`.
-- **1** — codex exec failed. Read stderr + `$RUN_DIR/result.json`. Common: `error.message` contains "context window" → suggest `--effort=medium` (often triggered by `model_reasoning_effort = "xhigh"` in `~/.codex/config.toml`); auth / rate-limit → print verbatim and halt; otherwise print raw error and ask the user how to proceed. Never auto-retry.
-- **64** — wrapper rejected the call. Print stderr verbatim. Fix the arg if user-supplied, else it's a plugin wiring bug.
-
-#### Exit 2 — working-tree changed
-
-Read the stderr marker `WORKING_TREE_CHANGED:<comma-separated-files>` and `$RUN_DIR/result.json` for `preIterStash.hash` / `preIterStash.isEmpty` / `preIterStash.noHead` (all three are needed for the revert dispatch below). Print under `### Working-tree changed`:
-
-> Hi — I found these files changed during this run:
-> - `<file1>`
-> - `<file2>`
->
-> It could be an edit made by Codex (which is supposed to be read-only) **or** something you changed while the run was in progress. Were these changes made by you?
-
-Halt. Do **not** edit the plan. Do **not** call `ExitPlanMode`. Wait for the user.
-
-- **User says yes (they edited / it was their IDE):** acknowledge ("OK — leaving things as they are"). Then, **if the changed file looks like auto-generated noise that's currently tracked** (e.g., `.idea/*.iml`, build artifacts, framework caches — anything the user wouldn't intentionally edit), ask: "Want me to add `<file>` to `.gitignore` so this check doesn't trip on it again? Only say yes if it's truly auto-generated — committing it might be intentional." If yes, append the path (or a sensible pattern like `<dir>/`) to the project's root `.gitignore`. Then stop — user can re-invoke when ready.
-- **User says no / "it must be Codex":** say:
-  > Then this looks like Codex breaking the read-only contract. What would you like me to do?
-  > - **Revert** the working tree to the content state from before this run. Originally-untracked files re-appear as staged additions (bytes match, `git status` will look different).
-  > - **Stop** the run and leave the changes in place so you can inspect.
-
-  If the user accepts revert, dispatch on `preIterStash` (all branches are destructive — confirm with the user before running, then verify with `git status` after):
-
-  - `preIterStash.isEmpty === false` (snapshot exists, with or without HEAD):
-    ```bash
-    git restore --source=<preIterStash.hash> --staged --worktree -- :/
-    git clean -fd
-    ```
-
-  - `preIterStash.isEmpty === true && noHead === false` (clean pre-run tree, HEAD exists): restore from HEAD.
-    ```bash
-    git restore --source=HEAD --staged --worktree -- :/
-    git clean -fd
-    ```
-
-  - `preIterStash.isEmpty === true && noHead === true` (fresh repo, empty pre-run tree): `git clean -fd` only — no prior content to restore.
-
-### 5. Print Codex's review
-
-Under `### Codex review`, paste the wrapper's stdout verbatim — verdict (SOUND / NEEDS REVISION / FUNDAMENTAL ISSUES) and findings. If chat output was truncated, `Read` `$RUN_DIR/final.txt`.
-
-### 6. Validate every finding
-
-Codex is not an authority. Default posture: skeptical. **MANDATORY: invoke `Read` on the cited file before marking any verdict — context memory does not count.** If you haven't freshly read the code, the verdict is **UNVERIFIABLE**.
-
-Under `### Claude validation`, for **every** finding, use this exact entry shape (all four lines required):
-
-```
-- [severity] <summary>
-  - Claim: <what Codex asserts>
-  - Checked: <specific path:line ranges + URLs you READ for this verdict>
-  - Verdict: CONFIRMED | REFUTED | UNVERIFIABLE — <one-line reason grounded in what you just read>
-  - Action: <Codex's fix | different fix: ... | drop | flag to user>
-```
-
-For claims spanning many files, dispatch parallel `Agent` calls. For external claims (CVE/GHSA, versions, vendor behavior), use `WebSearch` / `WebFetch` against primary sources.
-
-Then under `#### What Codex missed`, do an independent fresh-eyes pass. End with **Net verdict**: SOUND / NEEDS REVISION / FUNDAMENTAL ISSUES — based on your validation, not Codex's verdict line.
-
-### 7. Update the plan (only if Net verdict is NEEDS REVISION or FUNDAMENTAL ISSUES)
-
-- Apply each CONFIRMED finding (your **Action** may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE items → list under `### Unverified items flagged to user` in chat.
-- The plan is the user's deliverable — keep it as a well-crafted plan with only the actual plan content. Anything plugin-related (validation state, review metadata) stays in `$RUN_DIR` and your chat reply. Edit the plan content directly. In your chat reply, summarize what you changed.
-- `PLAN_SOURCE = arg` → Edit `PLAN_PATH` in place.
-- `PLAN_SOURCE = inline` → output the revised plan in full under `### Revised plan` (do not edit `$RUN_DIR/plan.md` — it's the audit copy of what Codex saw).
-
-### 8. Re-present via ExitPlanMode
-
-Call `ExitPlanMode` with the (possibly updated) plan content — read from `PLAN_PATH` if `PLAN_SOURCE = arg`, else the revised plan from step 7 (or the original conversation plan if Net verdict was SOUND). If the tool schema isn't loaded, fetch it via `ToolSearch` with `select:ExitPlanMode`.
+That's it — the dispatched sub-skill handles everything from here (argument parsing, plan/audit execution, validation, ExitPlanMode or go-ahead prompt). Do not duplicate any of that logic in this router.
