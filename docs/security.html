@@ -17,13 +17,18 @@
   <meta property="og:site_name" content="codexgrill" />
   <meta property="og:title" content="Security audit — codexgrill" />
   <meta property="og:description" content="Read-only security audit. Claude reviews, Codex validates and extends, Claude finalizes. Fixes only after explicit go-ahead." />
-  <meta property="og:image" content="https://codexgrill.com/assets/og-image.png" />
+  <meta property="og:image" content="https://codexgrill.com/assets/og-security.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Security audit — codexgrill. Read-only, CWE-grounded vulnerability review." />
   <meta property="og:locale" content="en_US" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Security audit — codexgrill" />
   <meta name="twitter:description" content="Read-only security audit for your codebase, with CWE / CVE / GHSA grounding." />
-  <meta name="twitter:image" content="https://codexgrill.com/assets/og-image.png" />
+  <meta name="twitter:image" content="https://codexgrill.com/assets/og-security.png" />
+  <meta name="twitter:image:alt" content="Security audit — codexgrill" />
+  <meta name="twitter:site" content="@codeseasy" />
 
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23d97757'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h7' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23d97757'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h7' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
@@ -35,6 +40,57 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="./assets/style.css" />
+
+  <!-- Structured data: TechArticle -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Security audit — codexgrill",
+    "description": "Read-only security audit for your codebase. Claude reviews and writes a structured audit plan with CWE / CVE / GHSA references; Codex validates and extends; Claude finalizes. Fixes only after explicit go-ahead.",
+    "image": "https://codexgrill.com/assets/og-security.png",
+    "url": "https://codexgrill.com/security.html",
+    "mainEntityOfPage": "https://codexgrill.com/security.html",
+    "datePublished": "2026-05-17",
+    "dateModified": "2026-05-18",
+    "inLanguage": "en-US",
+    "proficiencyLevel": "Expert",
+    "author": { "@type": "Organization", "name": "codeseasy", "url": "https://github.com/codeseasy" },
+    "publisher": { "@type": "Organization", "name": "codeseasy", "url": "https://github.com/codeseasy" },
+    "about": { "@type": "SoftwareApplication", "name": "codexgrill", "url": "https://codexgrill.com/" },
+    "keywords": "security audit, vulnerability scanner, CWE, CVE, GHSA, OWASP, claude code, codex, AI security review",
+    "audience": { "@type": "Audience", "audienceType": "Developers" }
+  }
+  </script>
+
+  <!-- Structured data: Breadcrumb -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "codexgrill", "item": "https://codexgrill.com/" },
+      { "@type": "ListItem", "position": 2, "name": "Security audit", "item": "https://codexgrill.com/security.html" }
+    ]
+  }
+  </script>
+
+  <!-- Structured data: HowTo -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to run a security audit with codexgrill",
+    "description": "Use the /codexgrill:security-once or /codexgrill:security-loop slash command inside Claude Code to audit your codebase. Claude reviews, Codex validates, Claude finalizes.",
+    "totalTime": "PT5M",
+    "step": [
+      { "@type": "HowToStep", "name": "Install codexgrill", "text": "From inside Claude Code, run /plugin marketplace add codeseasy/codexgrill, then /plugin install codexgrill@codexgrill, then /reload-plugins." },
+      { "@type": "HowToStep", "name": "Run the audit", "text": "Run /codexgrill:security-once to audit the whole repo, or pass paths to scope. Use /codexgrill:security-loop to iterate until both models agree the audit is clean." },
+      { "@type": "HowToStep", "name": "Review findings", "text": "Read the audit plan at .claude/plans/security-audit-<ts>.md. Each finding has CWE references, evidence, and a copy-pasteable fix." },
+      { "@type": "HowToStep", "name": "Approve fixes", "text": "Fixes only run after your explicit go-ahead — never auto-applied." }
+    ]
+  }
+  </script>
 </head>
 <body>
 
@@ -52,7 +108,7 @@
         </svg>
       </span>
       <span class="cg-brand-name">codexgrill</span>
-      <span class="cg-brand-version">v1.1.2</span>
+      <span class="cg-brand-version">v1.1.3</span>
     </a>
 
     <ul class="cg-nav-links" id="nav-links">
@@ -90,28 +146,62 @@
   </div>
 
   <div class="container">
-    <div class="hero-text" style="max-width: 780px;">
-      <span class="hero-badge">
-        <span class="dot" aria-hidden="true"></span>
-        <span>Security audit flow</span>
-      </span>
-      <h1 class="hero-title" id="hero-title">
-        Audit your codebase
-        <span class="accent-line">read-only, <span class="accent">CWE-grounded</span></span>
-      </h1>
-      <p class="hero-sub">
-        Claude reads the codebase and dependency manifests, writes a structured security audit plan with CWE,
-        CVE, and GHSA references. Codex validates each finding and surfaces what Claude missed. Claude finalizes.
-        Fixes only happen after your <em>explicit</em> go-ahead.
-      </p>
-      <div class="hero-cta">
-        <a class="btn-primary" href="#usage">
-          <span>Show me the commands</span>
-          <i class="bi bi-arrow-right" aria-hidden="true"></i>
-        </a>
-        <a class="btn-ghost" href="#how-it-works">
-          <span>How it works</span>
-        </a>
+    <div class="hero-grid-layout">
+      <div class="hero-text">
+        <span class="hero-badge">
+          <span class="dot" aria-hidden="true"></span>
+          <span>Security audit flow</span>
+        </span>
+        <h1 class="hero-title" id="hero-title">
+          Audit your codebase
+          <span class="accent-line">read-only, <span class="accent">CWE-grounded</span></span>
+        </h1>
+        <p class="hero-sub">
+          Claude reads the codebase and dependency manifests, writes a structured security audit plan with CWE,
+          CVE, and GHSA references. Codex validates each finding and surfaces what Claude missed. Claude finalizes.
+          Fixes only happen after your <em>explicit</em> go-ahead.
+        </p>
+        <div class="hero-cta">
+          <a class="btn-primary" href="#usage">
+            <span>Show me the commands</span>
+            <i class="bi bi-arrow-right" aria-hidden="true"></i>
+          </a>
+          <a class="btn-ghost" href="#how-it-works">
+            <span>How it works</span>
+          </a>
+        </div>
+
+        <ul class="hero-checks">
+          <li><i class="bi bi-check2" aria-hidden="true"></i>OWASP Top 10 + CWE</li>
+          <li><i class="bi bi-check2" aria-hidden="true"></i>GHSA / NVD-grounded</li>
+          <li><i class="bi bi-check2" aria-hidden="true"></i>No auto-fixes</li>
+        </ul>
+      </div>
+
+      <!-- terminal demo (security-specific) -->
+      <div class="hero-terminal" aria-hidden="true">
+        <div class="term">
+          <div class="term-bar">
+            <span class="term-dots"><i></i><i></i><i></i></span>
+            <span class="term-title">claude code · security audit</span>
+            <span class="term-meta">scan</span>
+          </div>
+          <div class="term-body">
+            <div class="term-line"><span class="term-prompt">›</span> <span class="term-cmd">/codexgrill:security-once src/auth</span></div>
+            <div class="term-line term-out term-tag-claude">CLAUDE <span class="term-dim">·</span> reviewing src/auth + manifests…</div>
+            <div class="term-line term-out term-indent"><span class="term-bullet">•</span> <span class="term-bad">CRIT</span>  CWE-798 · auth/client.ts:42</div>
+            <div class="term-line term-out term-indent term-dim">&nbsp;&nbsp;&nbsp;&nbsp;hardcoded sk_live_ key in source</div>
+            <div class="term-line term-out term-indent"><span class="term-bullet">•</span> <span class="term-warn">HIGH</span> GHSA-rv95-896h · express@4.17.1</div>
+            <div class="term-line term-out term-tag-codex">CODEX  <span class="term-dim">·</span> validating + extending…</div>
+            <div class="term-line term-out term-indent"><span class="term-ok">CONFIRMED</span> CWE-798 — matches sk_live_ prefix</div>
+            <div class="term-line term-out term-indent"><span class="term-ok">EXTENDED</span>&nbsp; +CWE-209 · stack trace leak</div>
+            <div class="term-line term-out">✎ finalizing audit · <span class="term-dim">3 findings · 3 fixes</span></div>
+            <div class="term-line term-out term-tag-codex">CODEX  <span class="term-dim">·</span> re-review</div>
+            <div class="term-line term-out term-indent"><span class="term-ok">AUDIT CLEAN</span> — no further issues</div>
+            <div class="term-line term-out">? Proceed with the fixes? <span class="term-dim">(y/N)</span></div>
+            <div class="term-line"><span class="term-prompt">›</span> <span class="term-caret">▍</span></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

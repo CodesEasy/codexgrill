@@ -64,7 +64,7 @@
   // close on resize up to desktop
   let lastW = window.innerWidth;
   window.addEventListener('resize', () => {
-    if (window.innerWidth > 880 && lastW <= 880) closeMenu();
+    if (window.innerWidth > 1024 && lastW <= 1024) closeMenu();
     lastW = window.innerWidth;
   });
   // close on escape

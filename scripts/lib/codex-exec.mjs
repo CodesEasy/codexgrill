@@ -17,12 +17,18 @@ import readline from 'node:readline';
 
 export const VALID_EFFORTS = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh'];
 
-// Paths that auto-mutate while the user has an IDE / editor open. We skip
-// these in the working-tree containment check so they never trip a false
-// positive. Anything not listed here that changes still triggers the
-// neutral "was this you or Codex?" prompt — the command files offer to
-// add such paths to .gitignore.
+// Paths that auto-mutate while the user has an IDE / editor open, plus the
+// plugin's own per-run scratch directory. We skip these in the working-tree
+// containment check so they never trip a false positive. Anything not listed
+// here that changes still triggers the neutral "was this you or Codex?"
+// prompt — the command files offer to add such paths to .gitignore.
 export const DEFAULT_IGNORED_PATTERNS = [
+  // codexgrill's own per-run scratch — prompt.txt, codex.jsonl, final.txt,
+  // result.json, state.json, etc. live here. These are wrapper-internal
+  // bookkeeping, not source code. In projects that don't gitignore .claude/
+  // the wrapper's writes would otherwise trip the containment check as
+  // "new untracked files" (false positive).
+  '.claude/temp/codexgrill/**',
   // IDE config / state (JetBrains family, Visual Studio, VSCode, Cursor)
   '.idea/**',
   '.vs/**',
@@ -672,6 +678,20 @@ async function runGitOrThrow(args, opts = {}) {
   return r;
 }
 
+// Resolve the git repo root for the given cwd. Returns the absolute path with
+// forward slashes — matching the namespace of `git status --porcelain` output,
+// which is repo-root-anchored regardless of cwd. Throws `NotAGitRepoError`
+// when cwd is not inside a git working tree, and propagates `GitUnavailableError`
+// when the git binary is missing.
+export async function gitRepoRoot(cwd) {
+  const r = await runGit(['rev-parse', '--show-toplevel'], { cwd });
+  if (r.exitCode !== 0) {
+    if (/not a git repository/i.test(r.stderr)) throw new NotAGitRepoError(cwd);
+    throw new Error(`git rev-parse --show-toplevel failed (${r.exitCode}): ${r.stderr.trim() || 'no stderr'}`);
+  }
+  return r.stdout.trim().replaceAll('\\', '/');
+}
+
 // Capture tracked + untracked working-tree content as a single tree-commit,
 // pinned under a permanent ref like `refs/codexgrill/<runId>/iter-<N>-pre`.
 // Uses a temporary index (GIT_INDEX_FILE) so the user's index, working tree,
@@ -735,6 +755,6 @@ export async function createPreIterStash(cwd, runId, iter) {
     await runGitOrThrow(['update-ref', refName, stashSha], { cwd });
     return { stashHash: stashSha, refName, isEmpty: false, noHead };
   } finally {
-    await fs.unlink(tmpIndex).catch(() => {});
+    await fs.unlink(tmpIndex).catch(() => { });
   }
 }

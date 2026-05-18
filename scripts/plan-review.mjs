@@ -34,6 +34,7 @@ import {
   createPreIterStash,
   matchesIgnorePattern,
   diffNoIndex,
+  gitRepoRoot,
   CodexNotInstalledError,
   CodexExecFailedError,
   WorkingTreeChangedError,
@@ -552,7 +553,20 @@ async function main() {
   //   2. Auto-mutating IDE/OS state (`.idea/workspace.xml`, `.vs/`, `*.swp`,
   //      `.DS_Store`, …) — these change constantly while the user has their
   //      editor open and aren't source code Codex would meaningfully touch.
-  const runDirRel = path.relative(cwd, runDir).split(path.sep).join('/');
+  // Anchor runDirRel against the git repo root (matching the namespace of
+  // `git status --porcelain` output) — `path.relative(cwd, ...)` would be
+  // cwd-anchored and would miss matches when invoked from a subdirectory.
+  let repoRoot;
+  try {
+    repoRoot = await gitRepoRoot(cwd);
+  } catch (err) {
+    if (err instanceof NotAGitRepoError || err instanceof GitUnavailableError) {
+      process.stderr.write(`NOT_A_GIT_REPO: containment check requires a git working tree (${err.message})\n`);
+      process.exit(4);
+    }
+    throw err;
+  }
+  const runDirRel = path.relative(repoRoot, runDir).split(path.sep).join('/');
   const filterSnapshot = (snap) => {
     const out = {};
     for (const [p, h] of Object.entries(snap)) {

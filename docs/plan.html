@@ -17,13 +17,18 @@
   <meta property="og:site_name" content="codexgrill" />
   <meta property="og:title" content="Plan validation — codexgrill" />
   <meta property="og:description" content="Grill your implementation plans with Codex. Claude validates every finding against the real code." />
-  <meta property="og:image" content="https://codexgrill.com/assets/og-image.png" />
+  <meta property="og:image" content="https://codexgrill.com/assets/og-plan.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Plan validation — codexgrill. Grill your plans before implementation." />
   <meta property="og:locale" content="en_US" />
 
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Plan validation — codexgrill" />
   <meta name="twitter:description" content="Grill your implementation plans with Codex. Claude validates every finding against the real code." />
-  <meta name="twitter:image" content="https://codexgrill.com/assets/og-image.png" />
+  <meta name="twitter:image" content="https://codexgrill.com/assets/og-plan.png" />
+  <meta name="twitter:image:alt" content="Plan validation — codexgrill" />
+  <meta name="twitter:site" content="@codeseasy" />
 
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23d97757'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h7' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23d97757'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h7' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E" />
@@ -35,6 +40,55 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
   <link rel="stylesheet" href="./assets/style.css" />
+
+  <!-- Structured data: TechArticle -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "TechArticle",
+    "headline": "Plan validation — codexgrill",
+    "description": "Grill your implementation plans with Codex (read-only). Claude validates every finding against the real code before applying it.",
+    "image": "https://codexgrill.com/assets/og-plan.png",
+    "url": "https://codexgrill.com/plan.html",
+    "mainEntityOfPage": "https://codexgrill.com/plan.html",
+    "datePublished": "2026-05-17",
+    "dateModified": "2026-05-18",
+    "inLanguage": "en-US",
+    "proficiencyLevel": "Expert",
+    "author": { "@type": "Organization", "name": "codeseasy", "url": "https://github.com/codeseasy" },
+    "publisher": { "@type": "Organization", "name": "codeseasy", "url": "https://github.com/codeseasy" },
+    "about": { "@type": "SoftwareApplication", "name": "codexgrill", "url": "https://codexgrill.com/" },
+    "keywords": "claude code, codex, plan review, AI pair programming, adversarial review"
+  }
+  </script>
+
+  <!-- Structured data: Breadcrumb -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "codexgrill", "item": "https://codexgrill.com/" },
+      { "@type": "ListItem", "position": 2, "name": "Plan validation", "item": "https://codexgrill.com/plan.html" }
+    ]
+  }
+  </script>
+
+  <!-- Structured data: HowTo (install + use) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    "name": "How to validate an implementation plan with codexgrill",
+    "description": "Use the /codexgrill:plan-once or /codexgrill:plan-loop slash command inside Claude Code to have Codex grill your plan and Claude validate every finding.",
+    "totalTime": "PT2M",
+    "step": [
+      { "@type": "HowToStep", "name": "Install codexgrill", "text": "From inside Claude Code, run /plugin marketplace add codeseasy/codexgrill, then /plugin install codexgrill@codexgrill, then /reload-plugins." },
+      { "@type": "HowToStep", "name": "Grill the plan", "text": "Run /codexgrill:plan-once for a single pass, or /codexgrill:plan-loop to iterate until both models agree the plan is sound." },
+      { "@type": "HowToStep", "name": "Review and accept", "text": "Claude validates every finding against the real code and re-presents the revised plan via ExitPlanMode." }
+    ]
+  }
+  </script>
 </head>
 <body>
 
@@ -52,7 +106,7 @@
         </svg>
       </span>
       <span class="cg-brand-name">codexgrill</span>
-      <span class="cg-brand-version">v1.1.2</span>
+      <span class="cg-brand-version">v1.1.3</span>
     </a>
 
     <ul class="cg-nav-links" id="nav-links">
@@ -90,28 +144,61 @@
   </div>
 
   <div class="container">
-    <div class="hero-text" style="max-width: 780px;">
-      <span class="hero-badge">
-        <span class="dot" aria-hidden="true"></span>
-        <span>Plan validation flow</span>
-      </span>
-      <h1 class="hero-title" id="hero-title">
-        Grill your plans
-        <span class="accent-line">before <span class="accent">implementation</span></span>
-      </h1>
-      <p class="hero-sub">
-        Codex reviews your implementation plan for wrong assumptions, missing files, ordering risks,
-        security and perf gaps. Claude validates every finding against the real code, edits the plan,
-        re-presents it via <code>ExitPlanMode</code>.
-      </p>
-      <div class="hero-cta">
-        <a class="btn-primary" href="#usage">
-          <span>Show me the commands</span>
-          <i class="bi bi-arrow-right" aria-hidden="true"></i>
-        </a>
-        <a class="btn-ghost" href="#how-it-works">
-          <span>How it works</span>
-        </a>
+    <div class="hero-grid-layout">
+      <div class="hero-text">
+        <span class="hero-badge">
+          <span class="dot" aria-hidden="true"></span>
+          <span>Plan validation flow</span>
+        </span>
+        <h1 class="hero-title" id="hero-title">
+          Grill your plans
+          <span class="accent-line">before <span class="accent">implementation</span></span>
+        </h1>
+        <p class="hero-sub">
+          Codex reviews your implementation plan for wrong assumptions, missing files, ordering risks,
+          security and perf gaps. Claude validates every finding against the real code, edits the plan,
+          re-presents it via <code>ExitPlanMode</code>.
+        </p>
+        <div class="hero-cta">
+          <a class="btn-primary" href="#usage">
+            <span>Show me the commands</span>
+            <i class="bi bi-arrow-right" aria-hidden="true"></i>
+          </a>
+          <a class="btn-ghost" href="#how-it-works">
+            <span>How it works</span>
+          </a>
+        </div>
+
+        <ul class="hero-checks">
+          <li><i class="bi bi-check2" aria-hidden="true"></i>CONFIRMED / REFUTED / UNVERIFIABLE</li>
+          <li><i class="bi bi-check2" aria-hidden="true"></i>Loop converges in &le;7 iters</li>
+        </ul>
+      </div>
+
+      <!-- terminal demo (plan-specific) -->
+      <div class="hero-terminal" aria-hidden="true">
+        <div class="term">
+          <div class="term-bar">
+            <span class="term-dots"><i></i><i></i><i></i></span>
+            <span class="term-title">claude code · plan validation</span>
+            <span class="term-meta">iter 2/7</span>
+          </div>
+          <div class="term-body">
+            <div class="term-line"><span class="term-prompt">›</span> <span class="term-cmd">/codexgrill:plan-loop</span></div>
+            <div class="term-line term-out">↻ pinning thread <span class="term-dim">019…b21</span></div>
+            <div class="term-line term-out term-tag-codex">CODEX  <span class="term-dim">·</span> reviewing plan…</div>
+            <div class="term-line term-out term-indent"><span class="term-warn">NEEDS REVISION</span></div>
+            <div class="term-line term-out term-indent"><span class="term-bullet">•</span> HIGH <span class="term-dim">·</span> auth.ts:42 — race in token refresh</div>
+            <div class="term-line term-out term-indent"><span class="term-bullet">•</span> MED&nbsp; <span class="term-dim">·</span> missing rollback on retry</div>
+            <div class="term-line term-out term-tag-claude">CLAUDE <span class="term-dim">·</span> validating findings…</div>
+            <div class="term-line term-out term-indent"><span class="term-ok">CONFIRMED</span> auth.ts:42 — refresh isn't mutex-guarded</div>
+            <div class="term-line term-out term-indent"><span class="term-bad">REFUTED</span>&nbsp;&nbsp; queue.ts:88 — already idempotent</div>
+            <div class="term-line term-out">✎ revising plan · <span class="term-dim">applied 1, dropped 1</span></div>
+            <div class="term-line term-out term-tag-codex">CODEX  <span class="term-dim">·</span> re-review</div>
+            <div class="term-line term-out term-indent"><span class="term-ok">SOUND</span> — no remaining findings</div>
+            <div class="term-line"><span class="term-prompt">›</span> <span class="term-caret">▍</span></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
