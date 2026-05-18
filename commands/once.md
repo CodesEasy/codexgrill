@@ -3,29 +3,24 @@ description: Entry point for single-pass operations. Asks plan-validation vs sec
 argument-hint: "[args forwarded to the chosen sub-skill]"
 ---
 
-Router skill. Asks the user which flow they want — plan validation or security audit — then dispatches to the corresponding single-pass sub-skill with all arguments forwarded.
+Router. Ask the user which flow, then dispatch with `$ARGUMENTS` forwarded verbatim.
 
-Raw arguments: `$ARGUMENTS`
+## Skill names (use the exact string from the right column)
+
+| User picks       | Dispatch target            |
+|------------------|----------------------------|
+| Plan validation  | `codexgrill:plan-once`     |
+| Security audit   | `codexgrill:security-once` |
+
+Treat each name as one opaque string. Don't reformat the hyphen.
 
 ## Steps
 
-### 1. Ask the user which flow to run
+1. Call `AskUserQuestion` (fetch its schema via `ToolSearch select:AskUserQuestion` if not loaded). One question — `"Which codexgrill flow do you want to run?"` (header `"Flow"`) with two options:
+   - **"Plan validation"** — Grill an implementation plan with Codex (read-only).
+   - **"Security audit"** — Audit the codebase for vulnerabilities (read-only).
+2. Look up the user's pick in the table above. Copy the right-column string character-for-character.
+3. Call `Skill` (fetch via `ToolSearch select:Skill` if not loaded) with `skill` = that string and `args` = `$ARGUMENTS`.
+4. If `Skill` returns `Error: Unknown skill: ...`, copy the name from the error's `Did you mean ...?` suggestion and retry once. If it fails again, stop and tell the user the plugin install is broken.
 
-If the `AskUserQuestion` tool schema isn't loaded, fetch it via `ToolSearch` with `select:AskUserQuestion` first.
-
-Call `AskUserQuestion` with one question, two options:
-
-- **Question**: "Which codexgrill flow do you want to run?"
-- **Header**: "Flow"
-- **Options**:
-  - **"Plan validation"** — "Grill a plan with Codex (read-only). Single pass, then validate every finding against the real code and re-present via ExitPlanMode. You need either a plan-path argument or an active plan-mode plan."
-  - **"Security audit"** — "Codex + Claude audit the codebase for vulnerabilities (read-only). Claude does the initial review, Codex validates and extends, produces a security plan file you can act on. Default scope is the whole repo; pass paths to scope."
-
-### 2. Dispatch to the chosen sub-skill
-
-Use the `Skill` tool. If its schema isn't loaded, fetch it via `ToolSearch` with `select:Skill` first.
-
-- **User picked "Plan validation"** → call `Skill` with `skill = "codexgrill:plan-once"` and `args = "$ARGUMENTS"` (the original raw arguments, forwarded verbatim).
-- **User picked "Security audit"** → call `Skill` with `skill = "codexgrill:security-once"` and `args = "$ARGUMENTS"`.
-
-That's it — the dispatched sub-skill handles everything from here (argument parsing, plan/audit execution, validation, ExitPlanMode or go-ahead prompt). Do not duplicate any of that logic in this router.
+The dispatched sub-skill handles everything else.
