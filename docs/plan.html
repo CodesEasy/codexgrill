@@ -106,7 +106,7 @@
         </svg>
       </span>
       <span class="cg-brand-name">codexgrill</span>
-      <span class="cg-brand-version">v1.1.4</span>
+      <span class="cg-brand-version">v1.2.0</span>
     </a>
 
     <ul class="cg-nav-links" id="nav-links">
@@ -444,7 +444,7 @@ git clean -fd</code></pre>
       <table class="cg-table">
         <thead><tr><th>file</th><th>description</th></tr></thead>
         <tbody>
-          <tr><td><code>state.json</code></td><td>Run state — pinned <code>codex_thread_id</code>, per-iter verdicts, validation counts.</td></tr>
+          <tr><td><code>state.json</code></td><td>Run state — pinned <code>codex_thread_id</code>, per-iter verdicts, validation counts, <code>unverifiable_items</code> (load-bearing UNVERIFIABLE findings carried per iter for the finalization batch-question).</td></tr>
           <tr><td><code>refuted-log.txt</code></td><td>Cumulative refutations, prepended to each iteration's prompt so prior REFUTED findings aren't re-raised without new evidence.</td></tr>
           <tr><td><code>plan-snapshot-iter&lt;N&gt;.md</code></td><td>Verbatim copy of the plan body sent to Codex in iter N. Used as the baseline for iter N+1's diff.</td></tr>
           <tr><td><code>plan-diff-iter&lt;N&gt;.diff</code></td><td>Unified diff of plan changes vs the prior iter's snapshot.</td></tr>

@@ -1,0 +1,66 @@
+{
+  "description": "codexgrill security-findings v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "validation", "newFindings", "externalRefsChecked"],
+  "properties": {
+    "verdict": {
+      "type": "string",
+      "enum": ["AUDIT_CLEAN", "NEEDS_REVISION", "CRITICAL_ISSUES"]
+    },
+    "validation": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "originalFindingTitle", "codexVerdict", "severity", "category",
+          "cwe", "cveOrGhsa", "path", "startLine", "endLine", "quote",
+          "reasoning", "recommendedFix", "references"
+        ],
+        "properties": {
+          "originalFindingTitle": { "type": "string" },
+          "codexVerdict": { "type": "string", "enum": ["CONFIRMED", "REFUTED", "EXTENDED"] },
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low", "info"] },
+          "category": { "type": "string" },
+          "cwe": { "type": ["string", "null"] },
+          "cveOrGhsa": { "type": ["string", "null"] },
+          "path": { "type": ["string", "null"] },
+          "startLine": { "type": ["integer", "null"] },
+          "endLine": { "type": ["integer", "null"] },
+          "quote": { "type": ["string", "null"] },
+          "reasoning": { "type": "string" },
+          "recommendedFix": { "type": "string" },
+          "references": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "newFindings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title", "severity", "category", "cwe", "cveOrGhsa",
+          "path", "startLine", "endLine", "quote",
+          "reasoning", "recommendedFix", "references"
+        ],
+        "properties": {
+          "title": { "type": "string" },
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low", "info"] },
+          "category": { "type": "string" },
+          "cwe": { "type": ["string", "null"] },
+          "cveOrGhsa": { "type": ["string", "null"] },
+          "path": { "type": ["string", "null"] },
+          "startLine": { "type": ["integer", "null"] },
+          "endLine": { "type": ["integer", "null"] },
+          "quote": { "type": ["string", "null"] },
+          "reasoning": { "type": "string" },
+          "recommendedFix": { "type": "string" },
+          "references": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "externalRefsChecked": { "type": "array", "items": { "type": "string" } }
+  }
+}

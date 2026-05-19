@@ -32,6 +32,7 @@
 import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   assertCodexInstalled,
   validateEffort,
@@ -42,6 +43,7 @@ import {
   matchesIgnorePattern,
   diffNoIndex,
   gitRepoRoot,
+  validateFindingQuotes,
   CodexNotInstalledError,
   CodexExecFailedError,
   WorkingTreeChangedError,
@@ -49,6 +51,10 @@ import {
   GitUnavailableError,
   InvalidEffortError,
 } from './lib/codex-exec.mjs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const SECURITY_SCHEMA_PATH = path.join(__dirname, 'lib', 'schemas', 'security-findings.json');
 
 // Same pathological-diff threshold as plan-review.mjs: when the diff would be
 // bigger than 80% of the plan body, the diff is no longer cheaper than
@@ -104,30 +110,23 @@ the plan's existing findings.
 </dig_deeper_nudge>
 
 <structured_output_contract>
-First line: one-word verdict — AUDIT CLEAN, NEEDS REVISION, or CRITICAL ISSUES.
+Return ONLY a single JSON object matching the attached schema. No prose preamble.
+No markdown headings. No code fences. No "Here is the JSON:" wrapper.
 
-Then two sections (omit either if empty):
+The schema requires:
+- verdict: "AUDIT_CLEAN" | "NEEDS_REVISION" | "CRITICAL_ISSUES"
+- validation: array of entries for each finding in the plan you're reviewing
+- newFindings: array of vulnerabilities the plan missed
+- externalRefsChecked: array of URLs you consulted
 
-## Validation of plan's findings
-For each finding in the plan, one entry:
-- [severity] <finding summary>
-  - Verdict: CONFIRMED | REFUTED | EXTENDED — <one-line reason with cite>
-  - (if EXTENDED) Additional evidence: <new \`path:line\` or new advisory URL>
-  - (if REFUTED) Counter-evidence: <\`path:line\` showing it's not vulnerable>
+Every finding (validation and newFindings) MUST include a \`quote\` field that is a
+verbatim substring of the cited \`path\` at \`startLine-endLine\`. If you cannot
+quote a literal substring (e.g. design-level critique with no specific code),
+set \`quote\` to null. The wrapper validates quotes against the file; a fabricated
+or paraphrased quote will tag the finding as unverified.
 
-## New findings the plan missed
-For each new vuln, one entry:
-- [severity] <summary>
-  - Location: \`path/to/file.ext:LINE\` (or \`<package>@<version>\` for deps)
-  - CWE / CVE / GHSA: <id + primary URL>
-  - Evidence: <code excerpt or registry link>
-  - Recommended fix: <concrete code/config change>
-
-Optional trailing section:
-## External refs checked
-- <URLs consulted>
-
-Keep the response compact. No long preambles. No closing summary.
+For dependency findings with no code location, set \`path\`, \`startLine\`,
+\`endLine\`, and \`quote\` to null and put the package@version in \`category\`.
 </structured_output_contract>
 
 <verification_loop>
@@ -191,6 +190,55 @@ current plan at the path below, or withdraw any that you now reconsider.
 Same READ-ONLY + output contract as before.
 
 `;
+
+const DISPLAY_VERDICT = {
+  AUDIT_CLEAN: 'AUDIT CLEAN',
+  NEEDS_REVISION: 'NEEDS REVISION',
+  CRITICAL_ISSUES: 'CRITICAL ISSUES',
+};
+
+function renderEntry(f, { isValidation }) {
+  const sevTag = `[${f.severity}]`;
+  const title = isValidation ? f.originalFindingTitle : f.title;
+  const tags = [
+    f.line_drift ? '[line_drift]' : null,
+    f.unverified_citation ? '[unverified_citation]' : null,
+  ].filter(Boolean).join(' ');
+  // Dependency findings have null path/lines and carry `package@version` in `category`.
+  // Use category as the location when no file path is present — otherwise the package
+  // identifier would be lost.
+  const loc = f.path
+    ? `\`${f.path}${f.startLine != null ? `:${f.startLine}-${f.endLine}` : ''}\``
+    : (f.category ? `\`${f.category}\` (dependency)` : '(no file location — design finding)');
+  const ids = [f.cwe, f.cveOrGhsa].filter(Boolean).join(' / ') || 'n/a';
+  const verdictLine = isValidation
+    ? `  - Verdict: ${f.codexVerdict} — ${f.reasoning}`
+    : `  - Evidence: ${f.reasoning}`;
+  const fixLine = `  - Recommended fix: ${f.recommendedFix}`;
+  const refs = (f.references || []).length ? `\n  - Refs: ${f.references.join(', ')}` : '';
+  const unvNote = f.unverified_citation ? `\n  - NOTE: ${f.unverified_reason}` : '';
+  return `- ${sevTag} ${title}${tags ? ' ' + tags : ''}\n  - Location: ${loc}\n  - CWE / CVE: ${ids}\n${verdictLine}\n${fixLine}${refs}${unvNote}`;
+}
+
+function renderToMarkdown(parsed) {
+  const out = [DISPLAY_VERDICT[parsed.verdict] ?? parsed.verdict, ''];
+  if (parsed.validation?.length) {
+    out.push("## Validation of plan's findings");
+    out.push(parsed.validation.map(f => renderEntry(f, { isValidation: true })).join('\n'));
+    out.push('');
+  }
+  if (parsed.newFindings?.length) {
+    out.push('## New findings the plan missed');
+    out.push(parsed.newFindings.map(f => renderEntry(f, { isValidation: false })).join('\n'));
+    out.push('');
+  }
+  if (parsed.externalRefsChecked?.length) {
+    out.push('## External refs checked');
+    out.push(parsed.externalRefsChecked.map(u => `- ${u}`).join('\n'));
+    out.push('');
+  }
+  return out.join('\n');
+}
 
 function parseArgs(argv) {
   const out = {
@@ -572,6 +620,7 @@ async function main() {
       effort: opts.effort,
       model: opts.model,
       ephemeral: opts.ephemeral,
+      outputSchema: opts.mode === 'fresh' ? SECURITY_SCHEMA_PATH : null,
       promptFileName,
       finalFileName,
       jsonlFileName,
@@ -732,9 +781,60 @@ async function main() {
     process.exit(1);
   }
 
-  // Emit Codex's final review to stdout verbatim.
-  process.stdout.write(execResult.finalMessage);
-  if (!execResult.finalMessage.endsWith('\n')) process.stdout.write('\n');
+  // `repoRoot` is ALREADY in scope from the containment-check block above
+  // (declared as `let repoRoot;` then assigned via `gitRepoRoot(cwd)`).
+  // Reuse the existing binding here.
+
+  // Normalize scopes to repo-relative so absolute `--scope` paths (e.g.
+  // `C:/Users/codes/Documents/Projects/foo/src` on Windows) match the
+  // repo-relative paths Codex emits in finding.path.
+  const scopesNormalized = scopes.map((s) => {
+    const abs = path.isAbsolute(s) ? s : path.resolve(cwd, s);
+    const rel = path.relative(repoRoot, abs).split(path.sep).join('/');
+    return rel === '' ? '.' : rel;
+  });
+
+  if (execResult.parsedOutput) {
+    const findingsFileName = onceNaming ? 'findings.json' : `findings-iter${opts.iter}.json`;
+    const findingsPath = path.join(runDir, findingsFileName);
+    await fs.writeFile(findingsPath, JSON.stringify(execResult.parsedOutput, null, 2), 'utf8');
+
+    // Defensive defaults: server-side strict mode enforces the schema, but if
+    // Codex ever returns a JSON-parseable object that lacks these arrays, we
+    // should render what we have rather than crash on a spread of undefined.
+    const allFindings = [
+      ...(execResult.parsedOutput.validation ?? []),
+      ...(execResult.parsedOutput.newFindings ?? []),
+    ];
+    const { summary } = await validateFindingQuotes(allFindings, { repoRoot, scopePaths: scopesNormalized });
+
+    const qvFileName = onceNaming ? 'quote-validation.json' : `quote-validation-iter${opts.iter}.json`;
+    await fs.writeFile(path.join(runDir, qvFileName), JSON.stringify(summary, null, 2), 'utf8');
+
+    if (summary.total >= 5 && summary.unverified / summary.total > 0.6) {
+      process.stderr.write(
+        `[wrapper] WARN: ${summary.unverified}/${summary.total} findings had unverifiable quotes — Codex may be hallucinating citations; treat this run with extra skepticism\n`,
+      );
+    }
+
+    // Render markdown ONCE, persist to disk AND write to stdout. Persisting solves
+    // the truncation-recovery path: when chat output is truncated, skill prompts
+    // read this rendered file (NOT raw final.txt which is JSON).
+    const reviewMd = renderToMarkdown(execResult.parsedOutput);
+    const reviewFileName = onceNaming ? 'review.md' : `review-iter${opts.iter}.md`;
+    await fs.writeFile(path.join(runDir, reviewFileName), reviewMd, 'utf8');
+    process.stdout.write(reviewMd);
+    if (!reviewMd.endsWith('\n')) process.stdout.write('\n');
+  } else {
+    // Schema parse failed OR resume iteration (no schema enforcement) — emit raw
+    // final message. Skill prompts continue to fall back to final.txt for truncation
+    // recovery on this branch (its content is plain markdown as today).
+    if (opts.mode === 'fresh') {
+      process.stderr.write('[wrapper] WARN: parsed output unavailable; emitting raw final message without quote validation\n');
+    }
+    process.stdout.write(execResult.finalMessage);
+    if (!execResult.finalMessage.endsWith('\n')) process.stdout.write('\n');
+  }
   process.exit(0);
 }
 

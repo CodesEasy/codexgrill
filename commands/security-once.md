@@ -190,7 +190,7 @@ Halt. Do **not** edit the plan further. Do **not** call `ExitPlanMode`. Wait for
 
 ### 6. Print Codex's review
 
-Under `### Codex review`, paste the wrapper's stdout verbatim — the verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), validation of each Claude finding (CONFIRMED / REFUTED / EXTENDED), and any new findings Codex added. If chat output was truncated, `Read` `$RUN_DIR/final.txt`.
+Under `### Codex review`, paste the wrapper's stdout verbatim — the verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), validation of each Claude finding (CONFIRMED / REFUTED / EXTENDED), and any new findings Codex added. If chat output was truncated, `Read` `$RUN_DIR/review.md` (the rendered markdown with quote-validation tags). Fall back to `$RUN_DIR/final.txt` only if `review.md` is absent (means schema parse failed; final.txt then contains plain markdown).
 
 ### 7. Phase 3 — Claude validates Codex's response
 
@@ -210,6 +210,20 @@ For claims spanning many files, dispatch parallel `Agent` calls. For external cl
 
 Then under `#### What Codex missed`, do an independent fresh-eyes pass.
 
+### 7.5. Phase 3.5 — Priority verification of `[unverified_citation]` tags
+
+The wrapper has quote-validated each Codex finding against the cited file (whitespace-tolerant) and tagged any mismatches `[unverified_citation]` or `[line_drift]` in the Codex review you just pasted. Before any other validation in step 7:
+
+1. List every bullet carrying `[unverified_citation]` or `[line_drift]`.
+2. For each: fresh `Read` the cited file; `Grep` for the quoted token across the whole file; check ±50 lines around the cited line range.
+3. Decide one of:
+   - **CONFIRMED at corrected location** — quote found at different lines. Revise the citation in the plan; do NOT silently keep the wrong line range.
+   - **CONFIRMED with new evidence** — quote not literal but vulnerability shape verifiable elsewhere in the file.
+   - **REFUTED** — quote absent and no other evidence stands.
+   - **UNVERIFIABLE** — cannot read the file, cannot decide, or evidence is genuinely indeterminate. Carry to step 9 batch-question.
+
+`[line_drift]` alone (without `[unverified_citation]`) means the quote was found in the file but at different lines — still treat as a citation correction, not a refutation.
+
 ### 8. Update `PLAN_PATH`
 
 - Apply each CONFIRMED finding (your **Action** may differ from Codex's recommended fix); apply anything from "What Codex missed". Drop REFUTED. UNVERIFIABLE items → list in the plan's "## Unverified items flagged to user" section.
@@ -219,6 +233,32 @@ Then under `#### What Codex missed`, do an independent fresh-eyes pass.
 ### 9. Phase 4 — Present
 
 **Self-check before presenting:** Confirm that Phase 2 (step 4) actually ran the wrapper and Phase 3 (step 7) validated Codex's response. If you skipped Phase 2 — for any reason, including plan-mode caution about Bash — **stop and go back to step 4 now**. Presenting Claude's first-pass plan without Codex validation is not the contract of this skill, and the user will get the wrong deliverable. The wrapper is read-only and safe to invoke in any mode.
+
+**Unverifiable batch-question (handle BEFORE empty-audit branch):** If `PLAN_PATH`'s "## Unverified items flagged to user" section is non-empty, halt here and ask the user in one batched message. Use a free-text prompt (NOT `AskUserQuestion` — the 4-question / 4-option cap can't handle 5+ items with free-form notes). Print:
+
+> ### Unverified items — your input needed
+> Codex flagged the following findings that I could not independently verify. For each, reply with the item number and one of:
+> - `skip` — drop from the plan
+> - `include` — keep as-is, tagged `[user-confirmed-despite-unverifiable]`
+> - `include with note: <text>` — keep with a short user note (one line, attached to the finding)
+>
+> 1. **[severity] <short title>** — `<path:line>` — <one-line reason it's unverifiable>
+>    Codex's claim: <one-line claim verbatim>
+>    Quote: `<quote or "(none)">`
+> 2. ...
+>
+> Reply in one message, e.g. `1. skip · 2. include with note: corroborated by partner pentest · 3. include`
+
+Wait for the response. Parse per item. If the user requests a severity downgrade or "include but mark low" for a clearly critical issue (unauthenticated RCE, hardcoded secret in committed code, etc.), push back in your reply BEFORE applying:
+
+> Industry-standard practice is to keep item N at <severity> because <one-line technical reason>. I'll apply your call if you confirm — reply `confirm N as <severity>` to override, or amend.
+
+After applying user decisions, update `PLAN_PATH`'s "## Unverified items flagged to user" section:
+- "skip" items: remove the entry entirely.
+- "include" items: keep the entry, add a `[user-confirmed-despite-unverifiable]` tag and (if a note was given) one short line "User note: <text>".
+- Plan file stays clean — no run IDs, no verbose narratives, no embedded chat history.
+
+Recompute severity counts in the "## Summary" block (skipped items reduce counts). Then proceed to the empty-audit branch and plan-mode detection as written below — both will now see the post-resolution state.
 
 **Empty-audit branch (handle first):** If `PLAN_PATH` has zero findings (Critical + High + Medium + Low + Info all zero) after Phase 3, skip the "should I proceed with fixes" prompt entirely. Print:
 

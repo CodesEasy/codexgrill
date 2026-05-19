@@ -126,7 +126,7 @@ Wait for the user's answer. Do not call `ExitPlanMode`.
 
 ### C. Print Codex's review
 
-Under `### Codex review (iter <i>)`, paste the wrapper's stdout verbatim — verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), per-finding validation (CONFIRMED / REFUTED / EXTENDED), and new findings. If chat output was truncated, `Read` `$RUN_DIR/final-iter<i>.txt`.
+Under `### Codex review (iter <i>)`, paste the wrapper's stdout verbatim — verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), per-finding validation (CONFIRMED / REFUTED / EXTENDED), and new findings. If chat output was truncated, `Read` `$RUN_DIR/review-iter<i>.md` (fresh-mode iter 1 only — has quote-validation tags). For resume iters (2+), or if `review-iter<i>.md` is absent, fall back to `final-iter<i>.txt` (plain markdown).
 
 ### D. After iter 1 ONLY: capture the thread_id
 
@@ -147,6 +147,10 @@ Under `### Claude validation (iter <i>)`, for every Codex finding (validation of
 ```
 
 For claims spanning many files, dispatch parallel `Agent` calls. For external claims (CVE/GHSA, versions, vendor behavior), use `WebSearch` / `WebFetch` against primary sources. Then under `#### What Codex missed`, do an independent fresh-eyes pass.
+
+### E.5. Priority verification of `[unverified_citation]` tags (iter <i>)
+
+Same procedure as `security-once.md` Phase 3.5. Any finding tagged `[unverified_citation]` or `[line_drift]` by the wrapper gets priority validation against the cited file before the refuted-log is updated. UNVERIFIABLE items accumulate in `PLAN_PATH`'s "## Unverified items flagged to user" section across iterations — they are resolved in ONE batch at finalization, never per iter.
 
 ### F. Update the refuted-log (cumulative)
 
@@ -193,13 +197,19 @@ Before deciding "clean", state the strongest reason it might NOT be — if real,
 
 ### Cap reached without converging
 
-If `i == MAX_ITERS` and step H didn't exit: stop the loop. Print `### ⏸ Did not converge in <MAX_ITERS> rounds`. Show Codex's last review and your last validation as a summary. Tell the user: "Cap reached. Latest plan is at `<PLAN_PATH>`. Run artifacts in `<RUN_DIR>`. Waiting for your instruction — bump `--max`, edit manually, or accept as-is." Do not call `ExitPlanMode`.
+If `i == MAX_ITERS` and step H didn't exit:
+
+**Unverifiable batch-question (cap-reached path):** Even though we're stopping without convergence, if `PLAN_PATH`'s "## Unverified items flagged to user" section is non-empty, run the security-once Phase 4 batch-question procedure now — the user shouldn't be left with unresolved unverified items just because the loop hit the cap. Apply decisions to the plan, then print the ⏸ message and stop as written.
+
+Stop the loop. Print `### ⏸ Did not converge in <MAX_ITERS> rounds`. Show Codex's last review and your last validation as a summary. Tell the user: "Cap reached. Latest plan is at `<PLAN_PATH>`. Run artifacts in `<RUN_DIR>`. Waiting for your instruction — bump `--max`, edit manually, or accept as-is." Do not call `ExitPlanMode`.
 
 ## Finalization
 
 **Self-check before finalizing:** Confirm at least one iteration's wrapper invocation (step A) actually ran. If you skipped the wrapper in every iteration — for any reason, including plan-mode caution about Bash — **stop and go back to iter 1's step A now**. Presenting Claude's first-pass plan without any Codex validation is not the contract of this skill.
 
 Tell the user where artifacts live (`<RUN_DIR>`). Then run a final Claude validation pass — re-verify every claim, code citation, version, file path, and external fact in `PLAN_PATH` against reality (heavier than per-iter validation; use parallel `Agent` calls for cross-file claims and `WebSearch` / `WebFetch` for external facts). Under `### Final Claude validation`, list what you checked. If anything is wrong, ambiguous, or missing — even something Codex blessed — do **not** call `ExitPlanMode` or `AskUserQuestion`; print the issue and wait.
+
+**Unverifiable batch-question (finalization path):** If `PLAN_PATH`'s "## Unverified items flagged to user" section is non-empty after convergence, halt and run the security-once Phase 4 batch-question procedure verbatim. Resolve all unverifiable items in one user round-trip before proceeding. Apply user decisions to the plan exactly as security-once specifies (including recomputing severity counts). Then continue to the per-mode presentation rules below.
 
 Otherwise present per the **Phase 4** rules from `commands/security-once.md`:
 

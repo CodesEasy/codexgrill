@@ -339,13 +339,21 @@ export async function assertCodexInstalled() {
 //   ephemeral         optional; if true, adds --ephemeral. (Must be false when
 //                     mode==='fresh' inside a loop run — persistence is needed
 //                     for the next iteration's resume.)
+//   outputSchema      optional path to a JSON Schema file. Only honored when
+//                     mode==='fresh' (codex exec resume does not accept the
+//                     flag). When set and finalMessage is non-empty, the result
+//                     also carries `parsedOutput` (JSON.parse of finalMessage).
 //
-// Returns: { threadId, finalMessage, usage, exitCode, errorReason }.
+// Returns: { threadId, finalMessage, usage, exitCode, errorReason,
+//            parsedOutput, parseError, ... }.
 //   threadId       UUID captured from thread.started event, or null on early failure.
 //   finalMessage   last item.completed (agent_message) text, or '' if none.
 //   usage          turn.completed.usage object, or null.
 //   exitCode       child's exit code (0 on success).
 //   errorReason    turn.failed.error.message or top-level error event message, if any.
+//   parsedOutput   JSON.parse(finalMessage) when outputSchema was set; null otherwise
+//                  (including on parse failure — see parseError).
+//   parseError     JSON.parse error message when outputSchema was set but parse failed.
 export async function runCodexExec(opts) {
   const {
     promptText,
@@ -357,6 +365,7 @@ export async function runCodexExec(opts) {
     effort,
     model,
     ephemeral = false,
+    outputSchema = null,
   } = opts;
 
   if (mode !== 'fresh' && mode !== 'resume') {
@@ -408,6 +417,15 @@ export async function runCodexExec(opts) {
   }
   if (ephemeral) {
     args.push('--ephemeral');
+  }
+  // `codex exec resume` does NOT accept --output-schema (verified against
+  // https://developers.openai.com/codex/cli/reference — the resume subcommand
+  // lists only --all, --image, --last, PROMPT, SESSION_ID). Gate the flag on
+  // fresh-mode only. Resume iterations rely on prompt-only structured output
+  // (the JSON shape is still requested in the prompt body — parsedOutput
+  // fallback handles parse failure).
+  if (outputSchema != null && mode === 'fresh') {
+    args.push('--output-schema', toCodexPath(outputSchema));
   }
   // Prompt from stdin (the `-` sentinel).
   args.push('-');
@@ -495,6 +513,17 @@ export async function runCodexExec(opts) {
     }
   }
 
+  let parsedOutput = null;
+  let parseError = null;
+  if (outputSchema != null && finalMessage) {
+    try {
+      parsedOutput = JSON.parse(finalMessage);
+    } catch (err) {
+      parseError = err.message;
+      process.stderr.write(`[wrapper] WARN: structured-output parse failed — ${err.message}; falling back to raw final message\n`);
+    }
+  }
+
   return {
     threadId,
     finalMessage,
@@ -506,6 +535,8 @@ export async function runCodexExec(opts) {
     promptPath,
     finalPath,
     jsonlPath,
+    parsedOutput,
+    parseError,
   };
 }
 
@@ -757,4 +788,71 @@ export async function createPreIterStash(cwd, runId, iter) {
   } finally {
     await fs.unlink(tmpIndex).catch(() => { });
   }
+}
+
+function compactWhitespace(s) {
+  return String(s ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeRelPath(p) {
+  return String(p).replace(/\\/g, '/').replace(/^\.\/+/, '');
+}
+
+function isInsideRoot(root, abs) {
+  const r = path.relative(root, abs);
+  return r === '' || (!r.startsWith('..') && !path.isAbsolute(r));
+}
+
+function isInScope(normalizedPath, scopeSet) {
+  for (const s of scopeSet) {
+    if (s === '.' || s === '') return true;
+    if (normalizedPath === s) return true;
+    if (normalizedPath.startsWith(s.endsWith('/') ? s : s + '/')) return true;
+  }
+  return false;
+}
+
+export async function validateFindingQuotes(findings, { repoRoot, scopePaths }) {
+  const fileCache = new Map();
+  const scopeSet = new Set((scopePaths ?? ['.']).map(normalizeRelPath));
+  const summary = { total: findings.length, matched: 0, skipped: 0, lineDrift: 0, unverified: 0, outOfScope: 0 };
+
+  for (const f of findings) {
+    // Skip empty/whitespace-only quotes — `' '.includes(' ')` would otherwise
+    // match any file containing a space and produce a spurious "matched".
+    if (!f.quote || !f.quote.trim() || !f.path) { summary.skipped++; continue; }
+    const np = normalizeRelPath(f.path);
+    const abs = path.resolve(repoRoot, np);
+    if (!isInsideRoot(repoRoot, abs) || !isInScope(np, scopeSet)) {
+      f.unverified_citation = true;
+      f.unverified_reason = 'path outside audit scope';
+      summary.outOfScope++; summary.unverified++; continue;
+    }
+    let contents = fileCache.get(abs);
+    if (contents === undefined) {
+      contents = await fs.readFile(abs, 'utf8').catch(() => null);
+      fileCache.set(abs, contents);
+    }
+    if (contents === null) {
+      f.unverified_citation = true;
+      f.unverified_reason = `file unreadable: ${f.path}`;
+      summary.unverified++; continue;
+    }
+    const lines = contents.split(/\r?\n/);
+    const slice = (Number.isInteger(f.startLine) && Number.isInteger(f.endLine))
+      ? lines.slice(f.startLine - 1, f.endLine).join('\n')
+      : contents;
+    const cq = compactWhitespace(f.quote);
+    if (slice.includes(f.quote) || compactWhitespace(slice).includes(cq)) {
+      summary.matched++; continue;
+    }
+    if (contents.includes(f.quote) || compactWhitespace(contents).includes(cq)) {
+      f.line_drift = true;
+      summary.lineDrift++; summary.matched++; continue;
+    }
+    f.unverified_citation = true;
+    f.unverified_reason = `quote not found at ${f.path}:${f.startLine ?? '?'}-${f.endLine ?? '?'}`;
+    summary.unverified++;
+  }
+  return { findings, summary };
 }

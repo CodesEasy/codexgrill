@@ -125,4 +125,12 @@ Then under `#### What Codex missed`, do an independent fresh-eyes pass. End with
 
 ### 8. Re-present via ExitPlanMode
 
+### Pre-present check — Unverifiable items
+
+If your per-finding Claude validation produced any `UNVERIFIABLE` verdicts that are still load-bearing (i.e., dropping them would leave the plan incomplete or risky), halt before `ExitPlanMode` and use the batch-question procedure from `commands/security-once.md` Phase 4 (free-text reply per numbered item). Same options: `skip`, `include`, `include with note: <text>`. Same push-back rule if the user's call is technically wrong. Same plan-file discipline (clean tags, no narratives).
+
+After applying user decisions, recompute the Net verdict if needed, then continue to `ExitPlanMode`.
+
+**Persistence note for plan-once:** Chat-within-turn memory is sufficient — the batch-question fires in the same turn as the per-finding validation that produced the UNVERIFIABLE verdicts. No state file or PLAN_PATH section is required. (Plan-loop is different — see below.)
+
 Call `ExitPlanMode` with the (possibly updated) plan content — read from `PLAN_PATH` if `PLAN_SOURCE = arg`, else the revised plan from step 7 (or the original conversation plan if Net verdict was SOUND). If the tool schema isn't loaded, fetch it via `ToolSearch` with `select:ExitPlanMode`.

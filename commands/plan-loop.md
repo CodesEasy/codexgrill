@@ -166,7 +166,7 @@ PREVIOUSLY REFUTED — do not re-raise without new evidence:
 
 ### G. Record this iteration in `state.json`
 
-Read `$RUN_DIR/state.json`, set `current_iter = <i>`, append:
+Read `$RUN_DIR/state.json`, set `current_iter = <i>`, append. Note: `plan-review.mjs` does NOT pass `--output-schema`, so Codex's response is plain prose — Claude extracts `claim`, `path`, and `quote` manually from Codex's bullet for each finding it marks UNVERIFIABLE (set them to null when Codex's bullet doesn't contain that data).
 
 ```json
 {
@@ -174,6 +174,15 @@ Read `$RUN_DIR/state.json`, set `current_iter = <i>`, append:
   "codex_thread_id": "<state.codex_thread_id>",
   "codex_verdict": "SOUND | NEEDS REVISION | FUNDAMENTAL ISSUES",
   "claude_validation": {"confirmed": N, "refuted": N, "unverifiable": N},
+  "unverifiable_items": [
+    {
+      "claim": "<Codex's claim verbatim, one line>",
+      "path": "<path:line or null>",
+      "quote": "<verbatim quote from Codex's finding, or null>",
+      "reason": "<one-line why Claude couldn't verify>",
+      "load_bearing": <true | false — would dropping this leave the plan incomplete?>
+    }
+  ],
   "containment_ok": true,
   "usage": "<from result-iter<i>.json.usage, optional>"
 }
@@ -193,14 +202,20 @@ Before deciding "clean", state the strongest reason it might NOT be — if real,
 
 ### I. Update the plan
 
-- Re-read `PLAN_PATH`. Apply each CONFIRMED finding using your **Action** (may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE → list under `### Unverified items flagged to user (iter <i>)` in chat.
+- Re-read `PLAN_PATH`. Apply each CONFIRMED finding using your **Action** (may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE → also recorded in `state.json.iterations[i].unverifiable_items[]` (per step G) so finalization can resolve them in one batch. In chat, list them under `### Unverified items flagged to user (iter <i>)` for the user's awareness this iter.
 - The plan file is the user's deliverable — keep it as a well-crafted plan with only the actual plan content. Anything plugin-related (iter numbers, validation state, review metadata) stays in `$RUN_DIR` and your chat reply. Edit the plan content directly. In your chat reply, summarize what you changed. Continue to the next iteration.
 
 ### Cap reached without converging
 
-If `i == MAX_ITERS` and step H didn't exit: stop the loop. Print `### ⏸ Did not converge in <MAX_ITERS> rounds`. Show Codex's last review and your last validation as a summary. Tell the user: "Cap reached. Latest plan is at `<PLAN_PATH>`. Run artifacts in `<RUN_DIR>`. Waiting for your instruction — bump `--max`, edit manually, or accept as-is." Do not call `ExitPlanMode`.
+If `i == MAX_ITERS` and step H didn't exit:
+
+**Unverifiable batch-question (cap-reached path):** Read `state.json.iterations[*].unverifiable_items[]`, dedupe by `claim`, filter to `load_bearing === true`. If non-empty, run the security-once Phase 4 batch-question procedure now and apply decisions to the plan. The user shouldn't be left with unresolved load-bearing items just because we hit the cap. Then print the ⏸ message and stop as written.
+
+Stop the loop. Print `### ⏸ Did not converge in <MAX_ITERS> rounds`. Show Codex's last review and your last validation as a summary. Tell the user: "Cap reached. Latest plan is at `<PLAN_PATH>`. Run artifacts in `<RUN_DIR>`. Waiting for your instruction — bump `--max`, edit manually, or accept as-is." Do not call `ExitPlanMode`.
 
 ## Finalization
+
+**Unverifiable batch-question (finalization path):** Read `state.json.iterations[*].unverifiable_items[]` and union by `claim` (dedupe items raised in multiple iters). Filter to `load_bearing === true`. If the resulting list is non-empty, halt and run the security-once Phase 4 batch-question procedure verbatim against that list. Apply user decisions to the plan, recompute Net verdict if needed, then continue with the existing finalization rules below.
 
 Tell the user where artifacts live (`<RUN_DIR>`). Then run a final Claude validation pass — re-verify every claim, code citation, version, file path, and external fact in `PLAN_PATH` against reality (heavier than per-iter validation; use parallel `Agent` calls for cross-file claims and `WebSearch` / `WebFetch` for external facts). Under `### Final Claude validation`, list what you checked. If anything is wrong, ambiguous, or missing — even something Codex blessed — do **not** call `ExitPlanMode`; print the issue and wait.
 

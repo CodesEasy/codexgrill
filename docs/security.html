@@ -108,7 +108,7 @@
         </svg>
       </span>
       <span class="cg-brand-name">codexgrill</span>
-      <span class="cg-brand-version">v1.1.4</span>
+      <span class="cg-brand-version">v1.2.0</span>
     </a>
 
     <ul class="cg-nav-links" id="nav-links">
@@ -482,9 +482,12 @@ git clean -fd</code></pre>
         <thead><tr><th>file</th><th>description</th></tr></thead>
         <tbody>
           <tr><td><code>prompt.txt</code></td><td>Exact prompt sent to Codex.</td></tr>
-          <tr><td><code>final.txt</code></td><td>Codex's final validation message.</td></tr>
+          <tr><td><code>final.txt</code></td><td>Codex's final validation message (raw — JSON when structured-output is in effect, plain markdown on fallback).</td></tr>
           <tr><td><code>codex.jsonl</code></td><td>Full JSONL event stream from <code>codex exec</code>.</td></tr>
           <tr><td><code>result.json</code></td><td>Wrapper summary — thread_id, exit_code, token usage, paths, preIterStash hash, plus <code>planHashBefore</code> / <code>planHashAfter</code> / <code>planFileChanged</code> for the plan-file containment check.</td></tr>
+          <tr><td><code>findings.json</code></td><td>Parsed structured-output JSON from Codex (verdict + validation[] + newFindings[] + externalRefsChecked[]). Schema: <code>scripts/lib/schemas/security-findings.json</code>.</td></tr>
+          <tr><td><code>quote-validation.json</code></td><td>Per-finding quote-match summary — <code>total</code>, <code>matched</code>, <code>skipped</code>, <code>lineDrift</code>, <code>unverified</code>, <code>outOfScope</code>.</td></tr>
+          <tr><td><code>review.md</code></td><td>Rendered markdown with <code>[line_drift]</code> / <code>[unverified_citation]</code> tags. This is what gets written to stdout; persisted for truncation-recovery.</td></tr>
         </tbody>
       </table>
     </div>
