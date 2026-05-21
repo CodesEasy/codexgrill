@@ -138,13 +138,17 @@ Wait for the user's answer. Do not call `ExitPlanMode`.
 
 Under `### Codex review (iter <i>)`, paste the wrapper's stdout verbatim. If chat output was truncated, `Read` `$RUN_DIR/final-iter<i>.txt`.
 
+Then print this exact bridge line in chat so the user sees the handoff to validation:
+
+> **Now revalidating each Codex finding against the actual code — no plan changes until every verdict is printed below.**
+
 ### D. After iter 1 ONLY: capture the thread_id
 
 `Read` `$RUN_DIR/result-iter1.json`. Extract `threadId`. Update `$RUN_DIR/state.json`: set `codex_thread_id` to that UUID. This is the pin every later iteration's `--resume-thread-id` reads. If `threadId` is `null` (Codex never emitted `thread.started`), halt the loop — resuming an unidentified thread is not safe.
 
 ### E. Validate every Codex finding
 
-Codex is not an authority. Default posture: skeptical. **MANDATORY: invoke `Read` on the cited file in THIS iteration before marking any verdict — context memory does not count.** If you haven't freshly read the code, the verdict is **UNVERIFIABLE**.
+Codex is not an authority. Default posture: skeptical. **MANDATORY: invoke `Read` on the cited file in THIS iteration before marking any verdict — context memory does not count.** If you haven't freshly read the code, the verdict is **UNVERIFIABLE**. **Print the full `### Claude validation` section in chat BEFORE any edit to `PLAN_PATH`** — the user sees every verdict (CONFIRMED, REFUTED, UNVERIFIABLE) before the plan changes.
 
 Under `### Claude validation (iter <i>)`, for **every** finding, use this exact entry shape (all four lines required):
 

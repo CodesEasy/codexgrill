@@ -196,9 +196,13 @@ Halt. Do **not** edit the plan further. Do **not** call `ExitPlanMode`. Wait for
 
 Under `### Codex review`, paste the wrapper's stdout verbatim — the verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), validation of each Claude finding (CONFIRMED / REFUTED / EXTENDED), and any new findings Codex added. If chat output was truncated, `Read` `$RUN_DIR/review.md` (the rendered markdown with quote-validation tags). Fall back to `$RUN_DIR/final.txt` only if `review.md` is absent (means schema parse failed; final.txt then contains plain markdown).
 
+Then print this exact bridge line in chat so the user sees the handoff to validation:
+
+> **Now revalidating each Codex finding against the actual code — no plan changes until every verdict is printed below.**
+
 ### 7. Phase 3 — Claude validates Codex's response
 
-Codex is not an authority. Default posture: skeptical. **MANDATORY: invoke `Read` on the cited file before marking any verdict — context memory does not count.** If you haven't freshly read the code, the verdict is **UNVERIFIABLE**.
+Codex is not an authority. Default posture: skeptical. **MANDATORY: invoke `Read` on the cited file before marking any verdict — context memory does not count.** If you haven't freshly read the code, the verdict is **UNVERIFIABLE**. **Print the full `### Claude validation` section in chat BEFORE any edit to `PLAN_PATH`** — the user sees every verdict (CONFIRMED, REFUTED, UNVERIFIABLE) before the plan changes.
 
 Under `### Claude validation`, for **every** Codex finding (validation of existing + NEW), use this exact entry shape (all four lines required):
 
