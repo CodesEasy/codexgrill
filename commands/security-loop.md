@@ -85,7 +85,11 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/security-audit.mjs" \
 
 Omit `--refuted-log` for iter 2 if no refutations exist yet — the wrapper treats a missing path as empty.
 
-**How to wait for completion.** Launch the wrapper with `run_in_background: true`. The system will notify you when the background command exits — that notification is the **only** authoritative "done" signal. Do **not**:
+**How to wait for completion.** Launch the wrapper with `run_in_background: true`. The system will notify you when the background command exits — that notification is the **only** authoritative "done" signal.
+
+**Codex can take 30+ minutes — wait for it to finish.** Run the wrapper in the background and do nothing else until the completion notification arrives. Verification of the findings begins after the report is ready, not before.
+
+Do **not**:
 - start a Monitor on the wrapper's stderr to check whether it's "done" — the wrapper streams progress lines (e.g. `[codex] $ <command>`, `[codex] ✗ tool returned code N`, `[codex] » <message>`) that describe Codex's internal activity, not wrapper status;
 - read `result-iter<i>.json` / `final-iter<i>.txt` / `codex-iter<i>.jsonl` before the completion notification — they are written incrementally or only-on-exit; the `result-iter<i>.json` file does not exist until the wrapper finishes, and absence of `turn.completed` mid-stream is not failure;
 - infer context-window exhaustion (or any other cause) from stderr volume, JSONL length, or prompt size while the wrapper is still running.
