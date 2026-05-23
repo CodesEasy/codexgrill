@@ -69,7 +69,7 @@ Read the codebase within `SCOPES` and write a structured findings file at `PLAN_
 - CORS misconfig — CWE-942
 - Insecure defaults / misconfig — CWE-1188
 
-**Write `PLAN_PATH`** using this exact structure (plan file = user's deliverable; keep it clean of plugin metadata):
+**Write `PLAN_PATH`** using this exact structure. **Plan stays clean — deliverable only.** Forbidden in the plan body: `Codex flagged`, `per Codex`, validation tags (`[CONFIRMED]`/`[REFUTED]`/`[UNVERIFIABLE]`/`[user-confirmed-despite-unverifiable]`/`[unverified_citation]`/`[line_drift]`), run IDs, `$RUN_DIR` paths, review narratives.
 
 ```markdown
 # Security audit — <repo name> — <ISO date>
@@ -236,7 +236,7 @@ The wrapper has quote-validated each Codex finding against the cited file (white
 
 - Apply each CONFIRMED finding (your **Action** may differ from Codex's recommended fix); apply anything from "What Codex missed". Drop REFUTED. UNVERIFIABLE items → list in the plan's "## Unverified items flagged to user" section.
 - Recompute the "## Summary" counts.
-- Plan file stays clean of plugin metadata (run IDs, validation state) — those live in `$RUN_DIR` and chat.
+- **Plan stays clean — deliverable only.** Forbidden in the plan body: `Codex flagged`, `per Codex`, validation tags (`[CONFIRMED]`/`[REFUTED]`/`[UNVERIFIABLE]`/`[user-confirmed-despite-unverifiable]`/`[unverified_citation]`/`[line_drift]`), run IDs, `$RUN_DIR` paths, review narratives. Only the structured sections from Phase 1 belong in the plan.
 
 ### 9. Phase 4 — Present
 
@@ -247,15 +247,14 @@ The wrapper has quote-validated each Codex finding against the cited file (white
 > ### Unverified items — your input needed
 > Codex flagged the following findings that I could not independently verify. For each, reply with the item number and one of:
 > - `skip` — drop from the plan
-> - `include` — keep as-is, tagged `[user-confirmed-despite-unverifiable]`
-> - `include with note: <text>` — keep with a short user note (one line, attached to the finding)
+> - `include` — keep the entry as a plain finding (no tag, no annotation)
 >
 > 1. **[severity] <short title>** — `<path:line>` — <one-line reason it's unverifiable>
 >    Codex's claim: <one-line claim verbatim>
 >    Quote: `<quote or "(none)">`
 > 2. ...
 >
-> Reply in one message, e.g. `1. skip · 2. include with note: corroborated by partner pentest · 3. include`
+> Reply in one message, e.g. `1. skip · 2. include · 3. skip`
 
 Wait for the response. Parse per item. If the user requests a severity downgrade or "include but mark low" for a clearly critical issue (unauthenticated RCE, hardcoded secret in committed code, etc.), push back in your reply BEFORE applying:
 
@@ -263,7 +262,7 @@ Wait for the response. Parse per item. If the user requests a severity downgrade
 
 After applying user decisions, update `PLAN_PATH`'s "## Unverified items flagged to user" section:
 - "skip" items: remove the entry entirely.
-- "include" items: keep the entry, add a `[user-confirmed-despite-unverifiable]` tag and (if a note was given) one short line "User note: <text>".
+- "include" items: keep the entry as a plain finding — no plugin tag, no auto-appended note. Decision is recorded in chat + `$RUN_DIR/state.json`, not the plan body.
 - Plan file stays clean — no run IDs, no verbose narratives, no embedded chat history.
 
 Recompute severity counts in the "## Summary" block (skipped items reduce counts). Then proceed to the empty-audit branch and plan-mode detection as written below — both will now see the post-resolution state.

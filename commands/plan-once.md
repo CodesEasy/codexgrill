@@ -30,7 +30,9 @@ Raw arguments: `$ARGUMENTS`
      ```
      On exit 0 → `PLAN_PATH = $RUN_DIR/plan.md`. On non-zero / uncertain path → `Write` the most recent `ExitPlanMode` plan from this conversation **verbatim** to `$RUN_DIR/plan.md`, then `PLAN_PATH = $RUN_DIR/plan.md`. No plan in either source → stop and tell the user.
 
-### 3. Run the wrapper
+### 3. Run the wrapper (REQUIRED — plan mode is fine)
+
+The wrapper is read-only by construction: SHA256-hashes the working tree and `PLAN_PATH` before/after Codex, exits 2 if anything changed (`scripts/lib/codex-exec.mjs`, `scripts/plan-review.mjs`). `$RUN_DIR` writes are excluded via `DEFAULT_IGNORED_PATTERNS`. The Bash invocation below is safe in any mode — do not skip it.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
@@ -127,15 +129,17 @@ Then under `#### What Codex missed`, do an independent fresh-eyes pass. End with
 ### 7. Update the plan (only if Net verdict is NEEDS REVISION or FUNDAMENTAL ISSUES)
 
 - Apply each CONFIRMED finding (your **Action** may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE items → list under `### Unverified items flagged to user` in chat.
-- The plan is the user's deliverable — keep it as a well-crafted plan with only the actual plan content. Anything plugin-related (validation state, review metadata) stays in `$RUN_DIR` and your chat reply. Edit the plan content directly. In your chat reply, summarize what you changed.
+- **Plan stays clean — deliverable only.** Forbidden in the plan body: `Codex flagged`, `per Codex`, validation tags (`[CONFIRMED]`/`[REFUTED]`/`[UNVERIFIABLE]`/`[user-confirmed-despite-unverifiable]`), run IDs, `$RUN_DIR` paths, review narratives. All review-process state lives in chat + `$RUN_DIR`. Edit the plan directly; summarize changes in chat.
 - `PLAN_SOURCE = arg` → Edit `PLAN_PATH` in place.
 - `PLAN_SOURCE = inline` → output the revised plan in full under `### Revised plan` (do not edit `$RUN_DIR/plan.md` — it's the audit copy of what Codex saw).
 
 ### 8. Re-present via ExitPlanMode
 
+**Self-check:** Did step 3 run this turn? If not — including because plan-mode caution about Bash — go back to step 3 now. The wrapper is read-only.
+
 ### Pre-present check — Unverifiable items
 
-If your per-finding Claude validation produced any `UNVERIFIABLE` verdicts that are still load-bearing (i.e., dropping them would leave the plan incomplete or risky), halt before `ExitPlanMode` and use the batch-question procedure from `commands/security-once.md` Phase 4 (free-text reply per numbered item). Same options: `skip`, `include`, `include with note: <text>`. Same push-back rule if the user's call is technically wrong. Same plan-file discipline (clean tags, no narratives).
+If your per-finding Claude validation produced any `UNVERIFIABLE` verdicts that are still load-bearing (i.e., dropping them would leave the plan incomplete or risky), halt before `ExitPlanMode` and use the batch-question procedure from `commands/security-once.md` Phase 4 (free-text reply per numbered item). Same options: `skip`, `include` (no plan-body annotations — decisions go to chat + `$RUN_DIR` only). Same push-back rule if the user's call is technically wrong. Same plan-file discipline (clean tags, no narratives).
 
 After applying user decisions, recompute the Net verdict if needed, then continue to `ExitPlanMode`.
 

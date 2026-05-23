@@ -23,6 +23,7 @@
 //   4   not a git working tree (containment check requires git)
 //   64  usage error (missing/invalid flag)
 
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import {
@@ -195,6 +196,11 @@ async function readIfExists(p) {
     if (err.code === 'ENOENT') return '';
     throw err;
   }
+}
+
+async function sha256OfFile(p) {
+  const buf = await fs.readFile(p);
+  return createHash('sha256').update(buf).digest('hex');
 }
 
 async function buildFreshPrompt({ planPath, refutedLogPath }) {
@@ -489,6 +495,14 @@ async function main() {
     throw err;
   }
 
+  let planHashBefore;
+  try {
+    planHashBefore = await sha256OfFile(planPath);
+  } catch (err) {
+    process.stderr.write(`failed to hash plan file before run: ${err.message}\n`);
+    process.exit(1);
+  }
+
   const runId = path.basename(runDir);
   let preIterStash;
   try {
@@ -547,6 +561,14 @@ async function main() {
     throw err;
   }
 
+  let planHashAfter;
+  try {
+    planHashAfter = await sha256OfFile(planPath);
+  } catch (err) {
+    process.stderr.write(`failed to hash plan file after run: ${err.message}\n`);
+    process.exit(1);
+  }
+
   // Filter snapshots so two classes of paths never trip containment:
   //   1. The wrapper's own run-dir artifacts (prompt.txt, codex.jsonl, final.txt,
   //      result.json) — created by us between snapshotBefore and snapshotAfter.
@@ -587,11 +609,24 @@ async function main() {
   } catch (err) {
     if (err instanceof WorkingTreeChangedError) {
       changedFiles = err.changedFiles;
-      process.stderr.write(`WORKING_TREE_CHANGED:${err.changedFiles.join(',')}\n`);
       containmentExit = 2;
     } else {
       throw err;
     }
+  }
+
+  let planFileChanged = false;
+  if (planHashBefore !== planHashAfter) {
+    planFileChanged = true;
+    const planPathRel = path.relative(cwd, planPath).split(path.sep).join('/');
+    if (!changedFiles.includes(planPathRel)) {
+      changedFiles = [...changedFiles, planPathRel];
+    }
+    containmentExit = 2;
+  }
+
+  if (containmentExit === 2) {
+    process.stderr.write(`WORKING_TREE_CHANGED:${changedFiles.join(',')}\n`);
   }
 
   // Decide whether the snapshot copy should run (loop-mode + all success gates
@@ -634,6 +669,9 @@ async function main() {
       noHead: preIterStash.noHead === true,
     },
     workingTreeChanged: containmentExit === 2,
+    planFileChanged,
+    planHashBefore,
+    planHashAfter,
     changedFiles,
     resumePromptMode,
     planSnapshotPath: actualSnapshotPath,

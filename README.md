@@ -83,7 +83,7 @@ Audit plan written to `.claude/plans/security-audit-<unix>.md`. Fixes only happe
 
 ## Learn more
 
-- **How it works**, the read-only safety contract (incl. the extra plan-file SHA256 check on security audits), revert procedure, findings format, artifacts reference, and tuning guidance all live on the docs site:
+- **How it works**, the read-only safety contract (SHA256 working-tree + plan-file hashing on both plan validation and security audits), revert procedure, findings format, artifacts reference, and tuning guidance all live on the docs site:
   - [Plan validation docs](https://codexgrill.com/plan.html)
   - [Security audit docs](https://codexgrill.com/security.html)
 - Source: this repository.

@@ -54,7 +54,9 @@ Set `UNIX_SECS = <current unix timestamp in seconds>`. Resolve `PLAN_PATH` (must
 
 Print a heading `## Iteration <i>` and run these steps:
 
-### A. Invoke the wrapper
+### A. Invoke the wrapper (REQUIRED every iteration — plan mode is fine)
+
+The wrapper is read-only by construction: SHA256-hashes the working tree and `PLAN_PATH` before/after Codex, exits 2 if anything changed; `$RUN_DIR` writes are excluded via `DEFAULT_IGNORED_PATTERNS`. The Bash invocations below are safe in any mode — do not skip them.
 
 **Iteration 1** (fresh thread — must NOT use `--ephemeral`; persistence is required for iter 2's resume):
 ```bash
@@ -211,7 +213,7 @@ Before deciding "clean", state the strongest reason it might NOT be — if real,
 ### I. Update the plan
 
 - Re-read `PLAN_PATH`. Apply each CONFIRMED finding using your **Action** (may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE → also recorded in `state.json.iterations[i].unverifiable_items[]` (per step G) so finalization can resolve them in one batch. In chat, list them under `### Unverified items flagged to user (iter <i>)` for the user's awareness this iter.
-- The plan file is the user's deliverable — keep it as a well-crafted plan with only the actual plan content. Anything plugin-related (iter numbers, validation state, review metadata) stays in `$RUN_DIR` and your chat reply. Edit the plan content directly. In your chat reply, summarize what you changed. Continue to the next iteration.
+- **Plan stays clean — deliverable only.** Forbidden in the plan body: `iter N`, `(iter <i>)`, `Codex flagged`, `per Codex`, `from review N`, validation tags (`[CONFIRMED]`/`[REFUTED]`/`[UNVERIFIABLE]`/`[user-confirmed-despite-unverifiable]`), run/thread IDs, `$RUN_DIR` paths, review narratives. All review-process state lives in chat + `$RUN_DIR`. Edit the plan directly; summarize changes in chat. Continue to the next iteration.
 
 ### Cap reached without converging
 
@@ -222,6 +224,8 @@ If `i == MAX_ITERS` and step H didn't exit:
 Stop the loop. Print `### ⏸ Did not converge in <MAX_ITERS> rounds`. Show Codex's last review and your last validation as a summary. Tell the user: "Cap reached. Latest plan is at `<PLAN_PATH>`. Run artifacts in `<RUN_DIR>`. Waiting for your instruction — bump `--max`, edit manually, or accept as-is." Do not call `ExitPlanMode`.
 
 ## Finalization
+
+**Self-check:** Did at least one iteration's step A actually run? If you skipped the wrapper in every iter — including because of plan-mode caution about Bash — go back to iter 1's step A now. The wrapper is read-only.
 
 **Unverifiable batch-question (finalization path):** Read `state.json.iterations[*].unverifiable_items[]` and union by `claim` (dedupe items raised in multiple iters). Filter to `load_bearing === true`. If the resulting list is non-empty, halt and run the security-once Phase 4 batch-question procedure verbatim against that list. Apply user decisions to the plan, recompute Net verdict if needed, then continue with the existing finalization rules below.
 

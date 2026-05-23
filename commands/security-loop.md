@@ -201,7 +201,7 @@ Before deciding "clean", state the strongest reason it might NOT be — if real,
 
 - Re-read `PLAN_PATH`. Apply each CONFIRMED finding using your **Action** (may differ from Codex's recommended fix); apply anything from "What Codex missed". Drop REFUTED. UNVERIFIABLE → list under the plan's "## Unverified items flagged to user" section.
 - Recompute the "## Summary" counts.
-- Plan file stays clean of plugin metadata. In your chat reply, summarize what you changed. Continue to the next iteration.
+- **Plan stays clean — deliverable only.** Forbidden in the plan body: `iter N`, `(iter <i>)`, `Codex flagged`, `per Codex`, `from review N`, validation tags (`[CONFIRMED]`/`[REFUTED]`/`[UNVERIFIABLE]`/`[user-confirmed-despite-unverifiable]`/`[unverified_citation]`/`[line_drift]`), run/thread IDs, `$RUN_DIR` paths. Only the structured sections from `security-once.md` Phase 1 belong in the plan. In your chat reply, summarize changes. Continue to the next iteration.
 
 ### Cap reached without converging
 
