@@ -473,6 +473,11 @@ export async function runCodexExec(opts) {
         }
       } else if (t === 'turn.completed') {
         if (evt.usage) usage = evt.usage;
+        // Codex retries on transient network errors (e.g. "Reconnecting... 2/5")
+        // and surfaces those as type:'error' events mid-stream. If turn.completed
+        // arrives, the retry succeeded — clear any transient errorReason so the
+        // wrapper doesn't falsely exit 1. turn.failed is a separate branch.
+        errorReason = null;
       } else if (t === 'turn.failed') {
         const msg = evt?.error?.message || evt?.error || 'turn.failed';
         errorReason = typeof msg === 'string' ? msg : JSON.stringify(msg);
