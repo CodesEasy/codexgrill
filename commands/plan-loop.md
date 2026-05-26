@@ -3,35 +3,34 @@ description: Loop Codex review + Claude validation until convergence, then prese
 argument-hint: "[path/to/plan.md] [--max=N] [--effort=<level>] [--model=<name>]"
 ---
 
-Iteratively review and refine a plan with Codex (read-only) and Claude (validates + edits). The loop pins Codex to one thread: iter 1 captures the `thread_id` from Codex's JSONL stream; every later iter passes that UUID to `codex exec resume <id>` to preserve conversation context. Iter 1 sends the full plan inline. Resume iterations send a unified diff of plan changes since the last review plus the absolute path to the current plan (Codex pulls full context on demand via its file-read tools) — this keeps each turn small. The wrapper transparently falls back to inlining the full plan when the prior snapshot is missing, the diff is empty (no edits), or the diff is pathologically large (>80% of plan body).
+Grill the plan iteratively with Codex (read-only) and Claude (validates + edits). The loop pins Codex to one thread: iter 1 captures the `thread_id` from Codex's JSONL stream; every later iter passes that UUID to `codex exec resume <id>` to preserve conversation context. The wrapper auto-selects unified-diff vs full-plan-inline resume prompts. Loop until both models agree it's SOUND.
 
 Raw arguments: `$ARGUMENTS`
 
-## Setup
-
-### 1. Parse `$ARGUMENTS`
+## 1. PARSE ARGS
 
 - `--max=N` → `MAX_ITERS`. Default: `7`.
 - `--effort=<level>` → `EFFORT` (one of `none|minimal|low|medium|high|xhigh`). Default: omit.
 - `--model=<name>` → `MODEL`. Default: omit.
 - Anything else → the plan path (or empty).
 
-### 2. Resolve `PLAN_PATH` and compute `RUN_DIR`
+## 2. RESOLVE PLAN_PATH + RUN_DIR
 
-Set `UNIX_SECS = <current unix timestamp in seconds>`. Resolve `PLAN_PATH` (must be a file path — the loop edits it in place):
+`UNIX_SECS = <current unix timestamp in seconds>`. Resolve `PLAN_PATH` (must be a file path — the loop edits it in place):
 
-- plan-path arg given and the file exists → `PLAN_PATH = <that path>`.
+- plan-path arg given and file exists → `PLAN_PATH = <that path>`.
 - Else, if this session's `.claude/plans/*.md` path is known → `PLAN_PATH = <that path>`.
-- Else, if there's an `ExitPlanMode` plan in this conversation → copy `~/.claude/plans/<auto-name>.md`:
+- Else, if there's an `ExitPlanMode` plan in this conversation → copy it:
   ```bash
   node "${CLAUDE_PLUGIN_ROOT}/scripts/copy-plan.mjs" "<source-path>" ".claude/plans/codexgrill-<UNIX_SECS>.md"
   ```
-  On exit 0 → use the destination. On non-zero / uncertain path → `Write` the most recent `ExitPlanMode` plan **verbatim** to `.claude/plans/codexgrill-<UNIX_SECS>.md` and use that path.
-- Else stop — tell the user to run plan mode first or pass a path.
+  Exit 0 → use the destination. Non-zero / uncertain → `Write` the most recent `ExitPlanMode` plan **verbatim** to `.claude/plans/codexgrill-<UNIX_SECS>.md` and use that path.
+- Else ask:
+  > I can't find a plan file. Is this the one [`<best-guess>`], or do you want to share something else?
 
-`PLAN_BASENAME = <basename of PLAN_PATH with .md stripped, non-alphanumeric → `-`>`. `RUN_ID = loop-$UNIX_SECS-$PLAN_BASENAME`. `RUN_DIR = .claude/temp/codexgrill/$RUN_ID`. `$RUN_DIR` holds run-state only (per-iter prompts, finals, JSONL streams, refuted-log, `state.json`). **`PLAN_PATH` is not inside `$RUN_DIR`** — it's edited in place.
+`PLAN_BASENAME = <basename of PLAN_PATH with .md stripped, non-alphanumeric → `-`>`. `RUN_ID = loop-$UNIX_SECS-$PLAN_BASENAME`. `RUN_DIR = .claude/temp/codexgrill/$RUN_ID`. `$RUN_DIR` holds run-state only (per-iter prompts, finals, JSONL streams, refuted-log, `state.json`). **`PLAN_PATH` is not inside `$RUN_DIR`** — edited in place.
 
-### 3. Initialize `state.json`
+## 3. INITIALIZE state.json
 
 `Write` `$RUN_DIR/state.json` (the `Write` tool creates `$RUN_DIR` for you):
 
@@ -52,11 +51,11 @@ Set `UNIX_SECS = <current unix timestamp in seconds>`. Resolve `PLAN_PATH` (must
 
 ## The loop (iteration `i = 1..MAX_ITERS`)
 
-Print a heading `## Iteration <i>` and run these steps:
+Print a heading `## Iteration <i>` and run steps A-I:
 
-### A. Invoke the wrapper (REQUIRED every iteration — plan mode is fine)
+### A. WRAPPER (REQUIRED every iteration — plan mode is fine)
 
-The wrapper is read-only by construction: SHA256-hashes the working tree and `PLAN_PATH` before/after Codex, exits 2 if anything changed; `$RUN_DIR` writes are excluded via `DEFAULT_IGNORED_PATTERNS`. The Bash invocations below are safe in any mode — do not skip them.
+**Run the Bash below — even in plan mode.** Read-only by SHA256 contract on (working tree, PLAN_PATH); exits 2 if either mutated. `$RUN_DIR` writes excluded via `DEFAULT_IGNORED_PATTERNS`.
 
 **Iteration 1** (fresh thread — must NOT use `--ephemeral`; persistence is required for iter 2's resume):
 ```bash
@@ -68,7 +67,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
   [--effort <EFFORT>] [--model <MODEL>]
 ```
 
-**Iteration 2+** (resume the pinned thread; the wrapper auto-selects a unified-diff prompt when iter 1 wrote a snapshot, falling back to full-plan inline for missing-snapshot / no-change / pathological-diff cases — see README "Artifacts" section for the `resumePromptMode` field on `result-iter<N>.json`):
+**Iteration 2+** (resume the pinned thread; wrapper auto-selects unified-diff prompt when iter 1 wrote a snapshot, falling back to full-plan inline for missing-snapshot / no-change / pathological-diff cases — see `resumePromptMode` field in `result-iter<i>.json`):
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
   --plan "<PLAN_PATH>" \
@@ -82,29 +81,22 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
 
 Omit `--refuted-log` for iter 2 if no refutations exist yet — the wrapper treats a missing path as empty.
 
-**How to wait for completion.** Launch the wrapper with `run_in_background: true`. The system will notify you when the background command exits — that notification is the **only** authoritative "done" signal.
+**Wait:** `run_in_background: true`. Codex can take 30+ min. **Completion notification = ONLY done signal** — mid-run stderr is Codex's internal noise (`[codex] $ ...` lines describe Codex's activity, not wrapper status), `result-iter<i>.json` / `final-iter<i>.txt` / `codex-iter<i>.jsonl` don't exist until exit, prompt size never proves context exhaustion. Verification starts after the notification.
 
-**Codex can take 30+ minutes — wait for it to finish.** Run the wrapper in the background and do nothing else until the completion notification arrives. Verification of the findings begins after the report is ready, not before.
+### B. BRANCH ON EXIT CODE
 
-Do **not**:
-- start a Monitor on the wrapper's stderr to check whether it's "done" — the wrapper streams progress lines (e.g. `[codex] $ <command>`, `[codex] ✗ tool returned code N`, `[codex] » <message>`) that describe Codex's internal activity, not wrapper status;
-- read `result-iter<i>.json` / `final-iter<i>.txt` / `codex-iter<i>.jsonl` before the completion notification — they are written incrementally or only-on-exit; the `result-iter<i>.json` file does not exist until the wrapper finishes, and absence of `turn.completed` mid-stream is not failure;
-- infer context-window exhaustion (or any other cause) from stderr volume, JSONL length, or prompt size while the wrapper is still running.
+| code | action |
+|---|---|
+| 0 | continue to step C |
+| 1 | Quote `errorReason` from `$RUN_DIR/result-iter<i>.json` verbatim — that's the authoritative diagnosis. If it contains `context window`, suggest `--effort=high`. For auth or rate-limit messages, halt verbatim. Otherwise **halt with the exact `errorReason`**. Never auto-retry; never silently fall back to `--mode fresh`; never infer from stderr or prompt size. |
+| 2 | Working-tree changed → step B.1 |
+| 3 | codex CLI missing → tell user: `npm install -g @openai/codex && codex login`. Stop. |
+| 4 | Not a git repo → tell user to `git init` or `cd` here. Stop. No `ExitPlanMode`. |
+| 64 | Wrapper rejected. Print stderr verbatim. Fix arg or it's a plugin wiring bug. |
 
-When the notification arrives, branch on the background command's exit code per the table below. For diagnosis details, read `$RUN_DIR/result-iter<i>.json` — its `errorReason` field is the authoritative Codex error, parsed from the JSONL `turn.failed` / `error` events.
+### B.1. EXIT 2 — WORKING-TREE CHANGED
 
-### B. Branch on the exit code
-
-- **0** — continue to step C.
-- **2** — working-tree changed. See "Exit 2 — working-tree changed" below.
-- **3** — codex CLI not installed. Tell the user: `npm install -g @openai/codex`, then `codex login`. Stop.
-- **4** — not a git working tree. Tell the user to `git init` or `cd` into the repo. Stop. Do not call `ExitPlanMode`.
-- **1** — codex exec failed. Read `$RUN_DIR/result-iter<i>.json` and quote its `errorReason` field verbatim — that is Codex's own error message (parsed from the JSONL `turn.failed` / `error` events) and the authoritative diagnosis. Do not infer the cause from stderr text, stream length, or prompt size. If `errorReason` literally contains `context window`, then (and only then) suggest `--effort=high` (often triggered by `model_reasoning_effort = "xhigh"` in `~/.codex/config.toml`). For auth or rate-limit messages, halt with the verbatim text. Otherwise halt with the exact `errorReason`. Never auto-retry and never silently fall back to `--mode fresh`.
-- **64** — wrapper rejected the call. Print stderr verbatim. Fix the arg if user-supplied, else it's a plugin wiring bug.
-
-#### Exit 2 — working-tree changed
-
-Read the stderr marker `WORKING_TREE_CHANGED:<comma-separated-files>` and `$RUN_DIR/result-iter<i>.json` for `preIterStash.hash` / `preIterStash.isEmpty` / `preIterStash.noHead` (all three are needed for the revert dispatch below). **STOP THE LOOP** at this iteration. Print under `### Working-tree changed (iter <i>)`:
+Read `WORKING_TREE_CHANGED:<files>` from stderr + `preIterStash.{hash, isEmpty, noHead}` from `$RUN_DIR/result-iter<i>.json`. **STOP THIS ITER.** Print under `### Working-tree changed (iter <i>)`:
 
 > Hi — I found these files changed during the codexgrill loop:
 > - `<file1>`
@@ -112,61 +104,45 @@ Read the stderr marker `WORKING_TREE_CHANGED:<comma-separated-files>` and `$RUN_
 >
 > It could be an edit made by Codex (which is supposed to be read-only) **or** something you changed while the loop was running. Were these changes made by you?
 
-Wait for the user's answer. Do not call `ExitPlanMode`.
+Wait for the user. Do not call `ExitPlanMode`.
 
-- **User says yes (they edited / it was their IDE) — continue the loop:** acknowledge ("OK, continuing the loop") and resume at iter `<i+1>`. **No special handling needed** — the next iteration's wrapper run takes a fresh `snapshotBefore` that already includes the user's edits as the new baseline, so they won't re-trip. Do not "reset" anything. Additionally, **if the changed file looks like auto-generated noise that's currently tracked** (e.g., `.idea/*.iml`, build artifacts, framework caches — anything the user wouldn't intentionally edit), ask: "Want me to add `<file>` to `.gitignore` so this check doesn't trip on it again? Only say yes if it's truly auto-generated — committing it might be intentional." If yes, append the path (or a sensible pattern like `<dir>/`) to the project's root `.gitignore` before resuming.
-- **User says no / "it must be Codex":** say:
-  > Then this looks like Codex breaking the read-only contract. What would you like me to do?
-  > - **Revert** the working tree to the content state from before iter `<i>`. Originally-untracked files re-appear as staged additions (bytes match, `git status` will look different).
-  > - **Stop** the loop and leave the changes in place so you can inspect.
+- **User says yes (their edit / IDE) — continue at iter <i+1>:** acknowledge ("OK, continuing the loop"). **No special handling needed** — the next iter's wrapper run takes a fresh `snapshotBefore` that already includes the user's edits as the new baseline. If the file looks auto-generated and tracked (`.idea/*.iml`, build artifacts, framework caches), offer to add to `.gitignore` before resuming.
+- **User says no / "must be Codex":** offer Revert (destructive — confirm first, verify with `git status` after) OR Stop. Note originally-untracked files re-appear as staged additions (bytes match). Revert dispatch on `preIterStash`:
+  - `isEmpty === false` → `git restore --source=<hash> --staged --worktree -- :/ && git clean -fd`
+  - `isEmpty === true && noHead === false` → `git restore --source=HEAD --staged --worktree -- :/ && git clean -fd`
+  - `isEmpty === true && noHead === true` → `git clean -fd` only (no prior content to restore)
 
-  If the user accepts revert, dispatch on `preIterStash` (all branches are destructive — confirm with the user before running, then verify with `git status` after):
+### C. PRINT CODEX'S REVIEW + BRIDGE
 
-  - `preIterStash.isEmpty === false` (snapshot exists, with or without HEAD):
-    ```bash
-    git restore --source=<preIterStash.hash> --staged --worktree -- :/
-    git clean -fd
-    ```
+Under `### Codex review (iter <i>)`, paste the wrapper's stdout verbatim. Truncated? `Read` `$RUN_DIR/final-iter<i>.txt`.
 
-  - `preIterStash.isEmpty === true && noHead === false` (clean pre-iter tree, HEAD exists): restore from HEAD.
-    ```bash
-    git restore --source=HEAD --staged --worktree -- :/
-    git clean -fd
-    ```
-
-  - `preIterStash.isEmpty === true && noHead === true` (fresh repo, empty pre-iter tree): `git clean -fd` only — no prior content to restore.
-
-### C. Print Codex's review
-
-Under `### Codex review (iter <i>)`, paste the wrapper's stdout verbatim. If chat output was truncated, `Read` `$RUN_DIR/final-iter<i>.txt`.
-
-Then print this exact bridge line in chat so the user sees the handoff to validation:
+Then print this exact bridge line:
 
 > **Now revalidating each Codex finding against the actual code — no plan changes until every verdict is printed below.**
 
-### D. After iter 1 ONLY: capture the thread_id
+### D. After iter 1 ONLY: CAPTURE THREAD_ID
 
-`Read` `$RUN_DIR/result-iter1.json`. Extract `threadId`. Update `$RUN_DIR/state.json`: set `codex_thread_id` to that UUID. This is the pin every later iteration's `--resume-thread-id` reads. If `threadId` is `null` (Codex never emitted `thread.started`), halt the loop — resuming an unidentified thread is not safe.
+`Read` `$RUN_DIR/result-iter1.json`. Extract `threadId`. Update `$RUN_DIR/state.json`: set `codex_thread_id` to that UUID. This is the pin every later iter's `--resume-thread-id` reads. If `threadId` is `null` (Codex never emitted `thread.started`), **halt the loop** — resuming an unidentified thread is not safe.
 
-### E. Validate every Codex finding
+### E. CLAUDE VALIDATES EVERY FINDING (MANDATORY)
 
-Codex is not an authority. Default posture: skeptical. **MANDATORY: invoke `Read` on the cited file in THIS iteration before marking any verdict — context memory does not count.** If you haven't freshly read the code, the verdict is **UNVERIFIABLE**. **Print the full `### Claude validation` section in chat BEFORE any edit to `PLAN_PATH`** — the user sees every verdict (CONFIRMED, REFUTED, UNVERIFIABLE) before the plan changes.
+Codex is not an authority. Default posture: skeptical. **MANDATORY: invoke `Read` on the cited file in THIS iteration before marking any verdict — context memory does NOT count.** If you haven't freshly read the code, the verdict is **UNVERIFIABLE**. **Print the full `### Claude validation (iter <i>)` BEFORE any edit to `PLAN_PATH`** — the user sees every verdict before the plan changes.
 
-Under `### Claude validation (iter <i>)`, for **every** finding, use this exact entry shape (all four lines required):
+For **every** finding, all four lines required:
 
 ```
 - [severity] <summary>
   - Claim: <what Codex asserts>
-  - Checked: <specific path:line ranges + URLs you READ this iteration>
+  - Checked: <path:line ranges + URLs you READ this iteration>
   - Verdict: CONFIRMED | REFUTED | UNVERIFIABLE — <one-line reason grounded in what you just read>
   - Action: <Codex's fix | different fix: ... | drop | flag to user>
 ```
 
-For claims spanning many files, dispatch parallel `Agent` calls. For external claims, use `WebSearch` / `WebFetch` against primary sources. Then under `#### What Codex missed`, do an independent fresh-eyes pass.
+Dispatch parallel `Agent` calls for multi-file claims; use `WebSearch`/`WebFetch` for external facts (CVE/GHSA, versions). Then under `#### What Codex missed`, do an independent fresh-eyes pass.
 
-### F. Update the refuted-log (cumulative)
+### F. UPDATE REFUTED-LOG (cumulative)
 
-If any REFUTED findings exist (this iter or prior), `Write` `$RUN_DIR/refuted-log.txt` with the cumulative list so the next iter's wrapper call prepends it. If no refutations exist yet, do **not** write the file — the wrapper treats a missing path as empty.
+If any REFUTED findings exist (this iter or prior), `Write` `$RUN_DIR/refuted-log.txt` with the cumulative list so the next iter's wrapper prepends it:
 
 ```
 PREVIOUSLY REFUTED — do not re-raise without new evidence:
@@ -174,9 +150,11 @@ PREVIOUSLY REFUTED — do not re-raise without new evidence:
 ...
 ```
 
-### G. Record this iteration in `state.json`
+If no refutations exist yet, do **not** write the file — the wrapper treats a missing path as empty.
 
-Read `$RUN_DIR/state.json`, set `current_iter = <i>`, append. Note: `plan-review.mjs` does NOT pass `--output-schema`, so Codex's response is plain prose — Claude extracts `claim`, `path`, and `quote` manually from Codex's bullet for each finding it marks UNVERIFIABLE (set them to null when Codex's bullet doesn't contain that data).
+### G. RECORD ITERATION in state.json
+
+Read `$RUN_DIR/state.json`, set `current_iter = <i>`, append. Note: `plan-review.mjs` does NOT pass `--output-schema`, so Codex's response is plain prose — Claude extracts `claim`, `path`, `quote` manually from Codex's bullet for each finding it marks UNVERIFIABLE (set them to null when Codex's bullet doesn't contain that data).
 
 ```json
 {
@@ -200,7 +178,7 @@ Read `$RUN_DIR/state.json`, set `current_iter = <i>`, append. Note: `plan-review
 
 Write the updated JSON back.
 
-### H. Decide if the plan is clean — both models must agree
+### H. BOTH-MODELS-AGREE CHECK
 
 Exit only when **all** hold:
 - Codex's verdict this iter was **SOUND**.
@@ -208,27 +186,30 @@ Exit only when **all** hold:
 - Your "What Codex missed" pass is empty.
 - No UNVERIFIABLE finding is load-bearing.
 
-Before deciding "clean", state the strongest reason it might NOT be — if real, it isn't. **Yes** → finalization. **No** → step I.
+Before deciding "clean", state the strongest reason it might NOT be — if real, it isn't. **Yes** → finalization. **No** → step I, then next iteration.
 
-### I. Update the plan
+### I. UPDATE PLAN
 
-- Re-read `PLAN_PATH`. Apply each CONFIRMED finding using your **Action** (may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE → also recorded in `state.json.iterations[i].unverifiable_items[]` (per step G) so finalization can resolve them in one batch. In chat, list them under `### Unverified items flagged to user (iter <i>)` for the user's awareness this iter.
-- **Plan stays clean — deliverable only.** Forbidden in the plan body: `iter N`, `(iter <i>)`, `Codex flagged`, `per Codex`, `from review N`, validation tags (`[CONFIRMED]`/`[REFUTED]`/`[UNVERIFIABLE]`/`[user-confirmed-despite-unverifiable]`), run/thread IDs, `$RUN_DIR` paths, review narratives. All review-process state lives in chat + `$RUN_DIR`. Edit the plan directly; summarize changes in chat. Continue to the next iteration.
+Re-read `PLAN_PATH`. Apply each CONFIRMED finding using your **Action** (may differ from Codex's fix); apply anything from "What Codex missed". Skip REFUTED. UNVERIFIABLE → also recorded in `state.json.iterations[i].unverifiable_items[]` (per step G) so finalization can resolve them in one batch. In chat, list them under `### Unverified items flagged to user (iter <i>)` for this iter's awareness.
+
+**Plan body = deliverable, not provenance.** Contains only: *what* the issue is, *where* (`path:line`), *how to fix it*. No process metadata — no iteration markers (`iter N` / `(iter <i>)`), no model attributions (`Codex flagged` / `per Codex` / `from review N`), no validation tags (`[CONFIRMED]` / `[REFUTED]` / `[UNVERIFIABLE]` / `[user-confirmed-despite-unverifiable]` / `[unverified_citation]` / `[line_drift]`), no run/thread IDs, no `$RUN_DIR` paths, no review narratives. All review-process state lives in chat + `$RUN_DIR`. **When editing the plan, strip any pre-existing process residue you encounter** — the plan must read identically whether the user runs this once or three times.
+
+Continue to the next iteration.
 
 ### Cap reached without converging
 
 If `i == MAX_ITERS` and step H didn't exit:
 
-**Unverifiable batch-question (cap-reached path):** Read `state.json.iterations[*].unverifiable_items[]`, dedupe by `claim`, filter to `load_bearing === true`. If non-empty, run the security-once Phase 4 batch-question procedure now and apply decisions to the plan. The user shouldn't be left with unresolved load-bearing items just because we hit the cap. Then print the ⏸ message and stop as written.
+**Unverifiable batch-question (cap-reached path):** Read `state.json.iterations[*].unverifiable_items[]`, dedupe by `claim`, filter to `load_bearing === true`. If non-empty, run the **batch-question procedure** defined in `commands/security-once.md` step 8 now (numbered items, free-text reply `1. skip · 2. include`, severity push-back). Apply decisions to the plan. The user shouldn't be left with unresolved load-bearing items just because we hit the cap.
 
-Stop the loop. Print `### ⏸ Did not converge in <MAX_ITERS> rounds`. Show Codex's last review and your last validation as a summary. Tell the user: "Cap reached. Latest plan is at `<PLAN_PATH>`. Run artifacts in `<RUN_DIR>`. Waiting for your instruction — bump `--max`, edit manually, or accept as-is." Do not call `ExitPlanMode`.
+Then stop the loop. Print `### ⏸ Did not converge in <MAX_ITERS> rounds`. Show Codex's last review and your last validation as a summary. Tell the user: "Cap reached. Latest plan is at `<PLAN_PATH>`. Run artifacts in `<RUN_DIR>`. Waiting for your instruction — bump `--max`, edit manually, or accept as-is." Do not call `ExitPlanMode`.
 
 ## Finalization
 
-**Self-check:** Did at least one iteration's step A actually run? If you skipped the wrapper in every iter — including because of plan-mode caution about Bash — go back to iter 1's step A now. The wrapper is read-only.
+**Self-check:** Did at least one iteration's step A actually run? If you skipped the wrapper in every iter — including because of plan-mode caution about Bash — go back to iter 1's step A now. The wrapper is read-only by construction.
 
-**Unverifiable batch-question (finalization path):** Read `state.json.iterations[*].unverifiable_items[]` and union by `claim` (dedupe items raised in multiple iters). Filter to `load_bearing === true`. If the resulting list is non-empty, halt and run the security-once Phase 4 batch-question procedure verbatim against that list. Apply user decisions to the plan, recompute Net verdict if needed, then continue with the existing finalization rules below.
+**Unverifiable batch-question (finalization path):** Read `state.json.iterations[*].unverifiable_items[]` and union by `claim` (dedupe items raised in multiple iters). Filter to `load_bearing === true`. Non-empty → halt and run the **batch-question procedure** from `commands/security-once.md` step 8 verbatim against that list. Apply user decisions to the plan: `skip` removes from any in-progress chat list; `include` keeps as a plain finding in the plan body (no tag, no auto-appended note; decision recorded in chat + `$RUN_DIR/state.json`, NOT the plan body). Plan body stays clean. Recompute Net verdict if needed.
 
-Tell the user where artifacts live (`<RUN_DIR>`). Then run a final Claude validation pass — re-verify every claim, code citation, version, file path, and external fact in `PLAN_PATH` against reality (heavier than per-iter validation; use parallel `Agent` calls for cross-file claims and `WebSearch` / `WebFetch` for external facts). Under `### Final Claude validation`, list what you checked. If anything is wrong, ambiguous, or missing — even something Codex blessed — do **not** call `ExitPlanMode`; print the issue and wait.
+Tell the user where artifacts live (`<RUN_DIR>`). Then run a **final Claude validation pass** — heavier than per-iter validation: re-verify every claim, code citation, version, file path, and external fact in `PLAN_PATH` against reality. Use parallel `Agent` calls for cross-file claims; `WebSearch` / `WebFetch` for external facts. Under `### Final Claude validation`, list what you checked. If anything is wrong, ambiguous, or missing — even something Codex blessed — do **not** call `ExitPlanMode`; print the issue and wait.
 
-Otherwise read `PLAN_PATH` and call `ExitPlanMode` with the full plan content. If the tool schema isn't loaded, fetch it via `ToolSearch` with `select:ExitPlanMode`.
+Otherwise read `PLAN_PATH` and call `ExitPlanMode` with the full plan content. If the tool schema isn't loaded, fetch via `ToolSearch select:ExitPlanMode`.
