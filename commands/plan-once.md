@@ -45,7 +45,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-review.mjs" \
   [--effort <EFFORT>] [--model <MODEL>]
 ```
 
-**Wait:** `run_in_background: true`. **The completion notification is the only done signal** — mid-run stderr is Codex's internal noise (`[codex] $ ...` lines describe Codex's activity, not wrapper status); `result.json` / `final.txt` / `codex.jsonl` don't exist until exit; prompt size never proves context exhaustion. Verification starts after the notification.
+**Wait:** launch with `run_in_background: true`. Codex often runs 30+ min — a long silent wait is normal. **The completion notification is the only done signal**: mid-run stderr is Codex's internal noise (`[codex] $ ...` = its activity, not wrapper status); `result.json` / `final.txt` / `codex.jsonl` don't exist until exit; prompt size never proves context exhaustion. Once the launch returns its shell ID, **end your turn and do nothing until the notification** — no `Read`, `Grep`, `Monitor`, `ScheduleWakeup` heartbeat, or `$RUN_DIR` polling, and no "still waiting" narration. The harness re-invokes you on exit; that's what advances to step 4.
 
 ## 4. BRANCH ON EXIT CODE
 
