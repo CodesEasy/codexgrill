@@ -12,7 +12,7 @@ Router. Ask the user which flow, then dispatch with `$ARGUMENTS` forwarded verba
 | Plan validation  | `codexgrill:plan-once`     |
 | Security audit   | `codexgrill:security-once` |
 
-Treat each name as one opaque string. Don't reformat the hyphen.
+Treat each name as one opaque string — copy it character-for-character, hyphen included.
 
 ## Steps
 
