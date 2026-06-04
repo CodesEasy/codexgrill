@@ -174,12 +174,18 @@ Omit `--refuted-log` for iter 2 if no refutations exist yet — the wrapper trea
 
 | code | action |
 |---|---|
-| 0 | continue to step C |
+| 0 | continue to step B.0 |
 | 1 | Quote `errorReason` from `$RUN_DIR/result-iter<i>.json` verbatim — that's the authoritative diagnosis. If it contains `context window`, suggest `--effort=high`. For auth or rate-limit messages, halt verbatim. Otherwise halt with the exact `errorReason`. Diagnose from `errorReason` alone — don't silently fall back to `--mode fresh`, and don't auto-retry, which can mask an auth, rate-limit, or context problem that needs a human call. |
 | 2 | Working-tree changed → step B.1 |
 | 3 | codex CLI missing → tell user: `npm install -g @openai/codex && codex login`. Stop. |
 | 4 | Not a git repo → tell user to `git init` or `cd` here. Stop. No `ExitPlanMode`. |
 | 64 | Wrapper rejected. Print stderr verbatim. Fix arg or it's a plugin wiring bug. |
+
+### B.0. ASSERT THE ITER ARTIFACT LANDED (exit 0)
+
+Confirm this iter wrote `$RUN_DIR/result-iter<i>.json` — use the file-tool **`Read`**, **not** shell `test -f`. This is load-bearing: `Read` resolves the relative path against the project root, the same base that writes `state.json`, so both always key off one base; `test -f` would resolve against the live (possibly drifted) cwd and check the wrong directory. If the `Read` fails, **halt** — do not continue:
+
+> iter `<i>` produced no artifact in `$RUN_DIR` — the run is split or the wrapper was bypassed; do not continue.
 
 ### B.1. EXIT 2 — WORKING-TREE CHANGED
 

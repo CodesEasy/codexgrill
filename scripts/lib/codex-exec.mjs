@@ -546,9 +546,13 @@ export async function runCodexExec(opts) {
 }
 
 // Snapshot the working tree's content state for containment checking.
-// Returns { [pathRelToCwd]: sha256hex | null } for every dirty + untracked path
-// reported by `git status --porcelain=v1 -z`.
-export async function snapshotWorkingTree(cwd = process.cwd()) {
+// Returns { [repoRootRelPath]: sha256hex | null } for every dirty + untracked
+// path reported by `git status --porcelain=v1 -z`. Porcelain keys are
+// repo-root-relative regardless of the cwd git runs in, so each key is resolved
+// against `base` (the repo root), not `cwd`. `git` still spawns with `{ cwd }`
+// (cwd selects which repo); only path resolution uses `base`. Default
+// `base = cwd` keeps callers that pass only `cwd` (repo root) unchanged.
+export async function snapshotWorkingTree(cwd = process.cwd(), base = cwd) {
   const { stdout, stderr, exitCode } = await new Promise((resolve, reject) => {
     let child;
     try {
@@ -600,7 +604,7 @@ export async function snapshotWorkingTree(cwd = process.cwd()) {
 
   const snapshot = {};
   for (const p of paths) {
-    const absPath = path.resolve(cwd, p);
+    const absPath = path.resolve(base, p);
     try {
       const data = await fs.readFile(absPath);
       snapshot[p] = createHash('sha256').update(data).digest('hex');
@@ -726,6 +730,23 @@ export async function gitRepoRoot(cwd) {
     throw new Error(`git rev-parse --show-toplevel failed (${r.exitCode}): ${r.stderr.trim() || 'no stderr'}`);
   }
   return r.stdout.trim().replaceAll('\\', '/');
+}
+
+// Stable base dir for resolving relative CLI path inputs: the git repo root of
+// startCwd, or startCwd itself when not in a repo / git unavailable. Anchoring
+// here (not process.cwd()) makes a stray `cd <subdir>` in the caller's shell
+// harmless — git rev-parse returns the same root from any subdir of the repo.
+// In a nested repo / submodule, gitRepoRoot resolves to the nearest enclosing
+// repo, which is the correct anchor for that working tree.
+export async function resolvePathBase(startCwd) {
+  try {
+    return await gitRepoRoot(startCwd);
+  } catch (err) {
+    // Expected: startCwd isn't in a git repo, or git is unavailable → fall back to
+    // startCwd; snapshotWorkingTree surfaces that condition cleanly later (exit 4).
+    if (err instanceof NotAGitRepoError || err instanceof GitUnavailableError) return startCwd;
+    throw err;   // an unexpected git failure (corrupt repo, perms) must NOT be masked
+  }
 }
 
 // Capture tracked + untracked working-tree content as a single tree-commit,

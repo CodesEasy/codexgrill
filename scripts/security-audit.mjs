@@ -43,6 +43,7 @@ import {
   matchesIgnorePattern,
   diffNoIndex,
   gitRepoRoot,
+  resolvePathBase,
   validateFindingQuotes,
   CodexNotInstalledError,
   CodexExecFailedError,
@@ -308,7 +309,7 @@ Flags:
   --effort <level>         Reasoning effort: none|minimal|low|medium|high|xhigh.
   --model <name>           Override the model for this run.
   --refuted-log <path>     Prepended verbatim to the prompt if non-empty.
-  --cwd <path>             Working directory passed to codex via --cd (default: process cwd).
+  --cwd <path>             Working directory passed to codex via --cd (default: git repo root of the current directory, or that directory if not in a repo).
   --ephemeral              Pass --ephemeral to codex (skips session persistence).
                            Once-mode only — never use in loop-mode iter 1.
 
@@ -320,11 +321,6 @@ Exit codes:
   4   not a git working tree
   64  usage error
 `);
-}
-
-function resolveFromCwd(p) {
-  if (!p) return p;
-  return path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
 }
 
 async function readIfExists(p) {
@@ -452,7 +448,18 @@ async function main() {
     process.exit(64);
   }
 
-  const planPath = resolveFromCwd(opts.plan);
+  // Anchor relative path inputs to a STABLE base — the git repo root of the
+  // caller's cwd (resolvePathBase), not the live process cwd. A stray `cd
+  // <subdir>` between iterations then can't split a run's artifacts across two
+  // directories. Computed BEFORE any path input is resolved. resolvePathBase
+  // only swallows NotAGitRepoError / GitUnavailableError (→ baseDir = startCwd,
+  // surfaced cleanly as exit 4 at the first snapshotWorkingTree below); an
+  // unexpected git failure rethrows and fails early by design.
+  const startCwd = opts.cwd ? path.resolve(process.cwd(), opts.cwd) : process.cwd();
+  const baseDir = await resolvePathBase(startCwd);
+  const resolveStable = (p) => (!p ? p : (path.isAbsolute(p) ? p : path.resolve(baseDir, p)));
+
+  const planPath = resolveStable(opts.plan);
   try {
     await fs.access(planPath);
   } catch {
@@ -460,7 +467,7 @@ async function main() {
     process.exit(64);
   }
 
-  const runDir = resolveFromCwd(opts.runDir);
+  const runDir = resolveStable(opts.runDir);
   await fs.mkdir(runDir, { recursive: true });
 
   // Default scope when none provided.
@@ -477,8 +484,12 @@ async function main() {
     throw err;
   }
 
-  const cwd = opts.cwd ? resolveFromCwd(opts.cwd) : process.cwd();
-  const refutedLogPath = opts.refutedLog ? resolveFromCwd(opts.refutedLog) : null;
+  // Containment/review cwd: an explicit --cwd drives codex --cd and the
+  // pre-iter stash exactly as before; with no --cwd, default to the repo root
+  // (baseDir) so a stray cd can't move it. Relative --scope is normalized
+  // against this cwd below, so it now produces correct repo-root-relative scopes.
+  const cwd = opts.cwd ? startCwd : baseDir;
+  const refutedLogPath = opts.refutedLog ? resolveStable(opts.refutedLog) : null;
 
   // Resume-mode dispatch artifacts.
   let resumePromptMode = null;     // 'diff' | 'full-plan-fallback' | 'no-change' (null for fresh)
@@ -570,7 +581,7 @@ async function main() {
   // Working-tree snapshot BEFORE Codex runs.
   let snapshotBefore;
   try {
-    snapshotBefore = await snapshotWorkingTree(cwd);
+    snapshotBefore = await snapshotWorkingTree(cwd, baseDir);
   } catch (err) {
     if (err instanceof NotAGitRepoError || err instanceof GitUnavailableError) {
       process.stderr.write(`NOT_A_GIT_REPO: containment check requires a git working tree (${err.message})\n`);
@@ -641,7 +652,7 @@ async function main() {
   // Working-tree snapshot AFTER Codex runs.
   let snapshotAfter;
   try {
-    snapshotAfter = await snapshotWorkingTree(cwd);
+    snapshotAfter = await snapshotWorkingTree(cwd, baseDir);
   } catch (err) {
     if (err instanceof NotAGitRepoError || err instanceof GitUnavailableError) {
       process.stderr.write(`NOT_A_GIT_REPO: containment check requires a git working tree (${err.message})\n`);
@@ -707,7 +718,9 @@ async function main() {
   let planFileChanged = false;
   if (planHashBefore !== planHashAfter) {
     planFileChanged = true;
-    const planPathRel = path.relative(cwd, planPath).split(path.sep).join('/');
+    // Keep the plan-file breach label in the same repo-root-relative namespace
+    // as the rest of changedFiles (the containment entries are repo-root-relative).
+    const planPathRel = path.relative(baseDir, planPath).split(path.sep).join('/');
     if (!changedFiles.includes(planPathRel)) {
       changedFiles = [...changedFiles, planPathRel];
     }
