@@ -122,7 +122,11 @@ Wait for the user. Do not call `ExitPlanMode`.
 
 ### C. PRINT CODEX'S REVIEW + BRIDGE
 
-Under `### Codex review (iter <i>)`, paste the wrapper's stdout verbatim. Truncated? `Read` `$RUN_DIR/final-iter<i>.txt`.
+<chat_deliverables>
+The user cannot see wrapper stdout, `$RUN_DIR` files, or tool results — the only way Codex's review and your validation ever reach them is the text you print in chat. `### Codex review (iter <i>)`, `### Claude validation (iter <i>)`, and finalization's `### Final Claude validation` are the product of this command, not status narration, so general guidance to keep between-tool-call text brief or to drop low-impact detail does not apply to them. Print each one as ordinary chat markdown, complete — every finding, every template line — even when it runs to hundreds of lines. A summary, an excerpt, a pointer to a file, or content that exists only in thinking does not count as printing them.
+</chat_deliverables>
+
+`Read` `$RUN_DIR/final-iter<i>.txt` — the authoritative copy of what the wrapper printed (background-shell stdout can truncate) — and print its complete contents under `### Codex review (iter <i>)`: verdict (SOUND / NEEDS REVISION / FUNDAMENTAL ISSUES) and all findings.
 
 Then print this exact bridge line:
 
@@ -135,7 +139,7 @@ Then print this exact bridge line:
 ### E. CLAUDE VALIDATES EVERY FINDING
 
 <investigate_before_answering>
-Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` in this iteration before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation (iter <i>)` before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes.
+Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` in this iteration before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation (iter <i>)` — **a chat deliverable per step C's contract** — before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes.
 </investigate_before_answering>
 
 For every finding, fill all four lines:
@@ -251,6 +255,10 @@ Write the updated JSON back.
 
 ### H. BOTH-MODELS-AGREE CHECK
 
+<chat_deliverables_check>
+**Self-check:** before evaluating the exit conditions below, confirm your visible output this iteration contains `### Codex review (iter <i>)` in full and `### Claude validation (iter <i>)` with every finding and all its lines. If either is missing, summarized, or only in a file, print it now, in full, then continue.
+</chat_deliverables_check>
+
 Exit only when **all** hold:
 - Codex's verdict this iter was **SOUND**.
 - All CONFIRMED findings are addressed.
@@ -267,7 +275,11 @@ Re-read `PLAN_PATH`. Apply each CONFIRMED finding using your **Action** (may dif
 The plan body stays clean — it's the deliverable, so it holds only what's needed to execute the plan and must read identically across re-runs. Everything that belongs to this codexgrill plugin — the word `Codex` itself, iteration markers (`iter N`), verdict labels (`[CONFIRMED]` / `[REFUTED]` / `[UNVERIFIABLE]`), model attributions like `Codex flagged` / `per Codex`, run/thread IDs, `$RUN_DIR` paths, review narratives — lives in chat + `$RUN_DIR`, not in the plan. Strip any such residue when editing.
 </clean_plan_body>
 
-Continue to the next iteration.
+Continue to the next iteration. As you end that turn — after the next iteration's step A launch returns its shell ID — close with a short recap as your final text (the final message is the durable one; it orients the user through the next long wait):
+
+> Iteration <i>: Codex <verdict> · validation: <N> confirmed / <M> refuted / <K> unverifiable · plan updated · iteration <i+1> running.
+
+This one closing recap is the single exception to step A's end-turn-and-do-nothing rule; it supplements the full sections printed above and never replaces them.
 
 ### Cap reached without converging
 

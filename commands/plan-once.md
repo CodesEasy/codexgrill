@@ -78,7 +78,11 @@ Halt entirely. Do **not** edit the plan. Do **not** call `ExitPlanMode`. Wait fo
 
 ## 5. PRINT CODEX'S REVIEW + BRIDGE
 
-Under `### Codex review`, paste the wrapper's stdout verbatim — verdict (SOUND / NEEDS REVISION / FUNDAMENTAL ISSUES) and findings. Truncated? `Read` `$RUN_DIR/final.txt`.
+<chat_deliverables>
+The user cannot see wrapper stdout, `$RUN_DIR` files, or tool results — the only way Codex's review and your validation ever reach them is the text you print in chat. `### Codex review` and `### Claude validation` are the product of this command, not status narration, so general guidance to keep between-tool-call text brief or to drop low-impact detail does not apply to them. Print each one as ordinary chat markdown, complete — every finding, every template line — even when it runs to hundreds of lines. A summary, an excerpt, a pointer to a file, or content that exists only in thinking does not count as printing them.
+</chat_deliverables>
+
+`Read` `$RUN_DIR/final.txt` — the authoritative copy of what the wrapper printed (background-shell stdout can truncate) — and print its complete contents under `### Codex review`: verdict (SOUND / NEEDS REVISION / FUNDAMENTAL ISSUES) and all findings.
 
 Then print this exact bridge line:
 
@@ -87,7 +91,7 @@ Then print this exact bridge line:
 ## 6. CLAUDE VALIDATES EVERY FINDING
 
 <investigate_before_answering>
-Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation` before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes.
+Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation` — **a chat deliverable per step 5's contract** — before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes.
 </investigate_before_answering>
 
 For every finding, fill all four lines:
@@ -176,6 +180,10 @@ The plan body stays clean — it's the deliverable, so it holds only what's need
 <read_only_contract>
 **Self-check:** Did step 3 run this turn? If not — including because of plan-mode caution about Bash — go back to step 3 now. The wrapper is read-only by construction.
 </read_only_contract>
+
+<chat_deliverables_check>
+**Self-check:** before `ExitPlanMode` (or the closing message when plan mode is off), confirm your visible output this turn contains `### Codex review` in full and `### Claude validation` with every finding and all its lines. If either is missing, summarized, or only in a file, print it now, in full, then continue.
+</chat_deliverables_check>
 
 **Pre-present batch-question (UNVERIFIABLE load-bearing items):** Chat-within-turn memory is sufficient for plan-once — the batch-question fires in the same turn as the per-finding validation that produced the UNVERIFIABLE verdicts. If any UNVERIFIABLE verdicts from step 6 are still load-bearing (dropping them would leave the plan incomplete or risky), halt before `ExitPlanMode` and ask in one batched free-text message (not `AskUserQuestion` — the 4-question / 4-option cap can't handle 5+ items with free-form notes):
 

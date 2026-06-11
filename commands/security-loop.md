@@ -207,7 +207,11 @@ Wait for the user. Do not call `ExitPlanMode`.
 
 ### C. PRINT CODEX'S REVIEW + BRIDGE
 
-Under `### Codex review (iter <i>)`, paste the wrapper's stdout verbatim — verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), per-finding validation (CONFIRMED / REFUTED / EXTENDED), and new findings. Truncated? `Read` `$RUN_DIR/review-iter<i>.md` (fresh-mode iter 1 only — has quote-validation tags). For resume iters (2+), or if `review-iter<i>.md` is absent, fall back to `final-iter<i>.txt` (plain markdown).
+<chat_deliverables>
+The user cannot see wrapper stdout, `$RUN_DIR` files, or tool results — the only way Codex's review and your validation ever reach them is the text you print in chat. `### Codex review (iter <i>)`, `### Claude validation (iter <i>)`, and finalization's `### Final Claude validation` are the product of this command, not status narration, so general guidance to keep between-tool-call text brief or to drop low-impact detail does not apply to them. Print each one as ordinary chat markdown, complete — every finding, every template line — even when it runs to hundreds of lines. A summary, an excerpt, a pointer to a file, or content that exists only in thinking does not count as printing them.
+</chat_deliverables>
+
+`Read` `$RUN_DIR/review-iter<i>.md` (fresh-mode iter 1 only — rendered markdown with quote-validation tags); for resume iters (2+), or if `review-iter<i>.md` is absent, fall back to `$RUN_DIR/final-iter<i>.txt` (plain markdown). Print its complete contents under `### Codex review (iter <i>)`: verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), per-finding validation (CONFIRMED / REFUTED / EXTENDED), and new findings. The artifact file is the source, not the background shell's stdout.
 
 Then print this exact bridge line:
 
@@ -220,7 +224,7 @@ Then print this exact bridge line:
 ### E. CLAUDE VALIDATES EVERY FINDING
 
 <investigate_before_answering>
-Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` in this iteration before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation (iter <i>)` before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes.
+Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` in this iteration before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation (iter <i>)` — **a chat deliverable per step C's contract** — before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes.
 </investigate_before_answering>
 
 For every Codex finding (validation of existing + NEW), fill all five lines:
@@ -239,7 +243,7 @@ Dispatch parallel `Agent` calls for multi-file claims — have each return a con
 
 ### E.5. PHASE 3.5 — Priority handling for [unverified_citation] / [line_drift] tags (iter <i>)
 
-The wrapper has quote-validated each Codex finding against the cited file (whitespace-tolerant) and tagged any mismatches `[unverified_citation]` or `[line_drift]` in the Codex review you just pasted. **Before any other validation in step E:**
+The wrapper has quote-validated each Codex finding against the cited file (whitespace-tolerant) and tagged any mismatches `[unverified_citation]` or `[line_drift]` in the Codex review you just printed. **Before any other validation in step E:**
 
 1. List every bullet carrying `[unverified_citation]` or `[line_drift]`.
 2. For each: fresh `Read` the cited file; `Grep` for the quoted token across the whole file; check ±50 lines around the cited line range.
@@ -341,6 +345,10 @@ Write the updated JSON back.
 
 ### H. BOTH-MODELS-AGREE CHECK
 
+<chat_deliverables_check>
+**Self-check:** before evaluating the exit conditions below, confirm your visible output this iteration contains `### Codex review (iter <i>)` in full and `### Claude validation (iter <i>)` with every finding and all its lines. If either is missing, summarized, or only in a file, print it now, in full, then continue.
+</chat_deliverables_check>
+
 Exit only when **all** hold:
 - Codex's verdict this iter was **AUDIT CLEAN**.
 - All CONFIRMED findings (Claude's verdicts on Codex's claims) are addressed in `PLAN_PATH`.
@@ -358,6 +366,12 @@ Recompute the `## Summary` counts.
 <clean_plan_body>
 The plan body stays clean — it's the deliverable, so it holds only the structured findings sections and must read identically across re-runs. Everything that belongs to this codexgrill plugin — the word `Codex` itself, iteration markers (`iter N`), verdict labels (`[CONFIRMED]` / `[REFUTED]` / `[UNVERIFIABLE]`), model attributions like `Codex flagged` / `per Codex`, run/thread IDs, `$RUN_DIR` paths, review narratives — lives in chat + `$RUN_DIR`, not in the plan. Strip any such residue when editing.
 </clean_plan_body>
+
+Continue to the next iteration. As you end that turn — after the next iteration's step A launch returns its shell ID — close with a short recap as your final text (the final message is the durable one; it orients the user through the next long wait):
+
+> Iteration <i>: Codex <verdict> · validation: <N> confirmed / <M> refuted / <K> unverifiable · plan updated · iteration <i+1> running.
+
+This one closing recap is the single exception to step A's end-turn-and-do-nothing rule; it supplements the full sections printed above and never replaces them.
 
 ### Cap reached without converging
 

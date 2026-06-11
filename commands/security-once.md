@@ -169,7 +169,11 @@ Halt entirely. Do **not** edit the plan further. Do **not** call `ExitPlanMode`.
 
 ## 5. PRINT CODEX'S REVIEW + BRIDGE
 
-Under `### Codex review`, paste the wrapper's stdout verbatim — verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), validation of each Claude finding (CONFIRMED / REFUTED / EXTENDED), and any new findings Codex added. Truncated? `Read` `$RUN_DIR/review.md` (rendered markdown with quote-validation tags). Fall back to `$RUN_DIR/final.txt` only if `review.md` is absent (schema parse failed; final.txt then contains plain markdown).
+<chat_deliverables>
+The user cannot see wrapper stdout, `$RUN_DIR` files, or tool results — the only way Codex's review and your validation ever reach them is the text you print in chat. `### Codex review` and `### Claude validation` are the product of this command, not status narration, so general guidance to keep between-tool-call text brief or to drop low-impact detail does not apply to them. Print each one as ordinary chat markdown, complete — every finding, every template line — even when it runs to hundreds of lines. A summary, an excerpt, a pointer to a file, or content that exists only in thinking does not count as printing them.
+</chat_deliverables>
+
+`Read` `$RUN_DIR/review.md` (rendered markdown with quote-validation tags); fall back to `$RUN_DIR/final.txt` only if `review.md` is absent (schema parse failed). Print its complete contents under `### Codex review`: verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), validation of each Claude finding (CONFIRMED / REFUTED / EXTENDED), and any new findings. The artifact file is the source, not the background shell's stdout.
 
 Then print this exact bridge line:
 
@@ -178,7 +182,7 @@ Then print this exact bridge line:
 ## 6. CLAUDE VALIDATES EVERY FINDING
 
 <investigate_before_answering>
-Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation` before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes.
+Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation` — **a chat deliverable per step 5's contract** — before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes.
 </investigate_before_answering>
 
 For every Codex finding (validation of existing + NEW), fill all five lines:
@@ -197,7 +201,7 @@ Dispatch parallel `Agent` calls for multi-file claims — have each return a con
 
 ### 6a. PHASE 3.5 — Priority handling for [unverified_citation] / [line_drift] tags
 
-The wrapper has quote-validated each Codex finding against the cited file (whitespace-tolerant) and tagged any mismatches `[unverified_citation]` or `[line_drift]` in the Codex review you just pasted. **Before any other validation in step 6:**
+The wrapper has quote-validated each Codex finding against the cited file (whitespace-tolerant) and tagged any mismatches `[unverified_citation]` or `[line_drift]` in the Codex review you just printed. **Before any other validation in step 6:**
 
 1. List every bullet carrying `[unverified_citation]` or `[line_drift]`.
 2. For each: fresh `Read` the cited file; `Grep` for the quoted token across the whole file; check ±50 lines around the cited line range.
@@ -277,6 +281,10 @@ The plan body stays clean — it's the deliverable, so it holds only the structu
 <read_only_contract>
 **Self-check:** Did step 3 run this turn? If not — for any reason, including plan-mode caution about Bash — stop and go back to step 3 now. Presenting Claude's first-pass plan without Codex validation is not the contract of this skill. The wrapper is read-only by construction.
 </read_only_contract>
+
+<chat_deliverables_check>
+**Self-check:** before `ExitPlanMode` (or the closing message when plan mode is off), confirm your visible output this turn contains `### Codex review` in full and `### Claude validation` with every finding and all its lines. If either is missing, summarized, or only in a file, print it now, in full, then continue.
+</chat_deliverables_check>
 
 ### Pre-present batch-question
 
