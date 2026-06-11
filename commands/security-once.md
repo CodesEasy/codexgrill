@@ -170,10 +170,10 @@ Halt entirely. Do **not** edit the plan further. Do **not** call `ExitPlanMode`.
 ## 5. PRINT CODEX'S REVIEW + BRIDGE
 
 <chat_deliverables>
-The user cannot see wrapper stdout, `$RUN_DIR` files, or tool results — the only way Codex's review and your validation ever reach them is the text you print in chat. `### Codex review` and `### Claude validation` are the product of this command, not status narration, so general guidance to keep between-tool-call text brief or to drop low-impact detail does not apply to them. Print each one as ordinary chat markdown, complete — every finding, every template line — even when it runs to hundreds of lines. A summary, an excerpt, a pointer to a file, or content that exists only in thinking does not count as printing them.
+The user cannot see wrapper stdout, `$RUN_DIR` files, or tool results — the only way Codex's review and your validation ever reach them is the text you print in chat. `### Codex review` and `### Claude validation` are the product of this command, not status narration, so general guidance to keep between-tool-call text brief or to drop low-impact detail does not apply to them. Print each one as ordinary chat markdown, complete — every finding, every template line — even when it runs to hundreds of lines. A summary, an excerpt, a pointer to a file, or content that exists only in thinking does not count as printing them. In this harness every text block you emit renders in the user's transcript and persists — including text between tool calls — so mid-turn printing is real delivery; any general caution that between-tool-call text may not be shown does not apply here.
 </chat_deliverables>
 
-`Read` `$RUN_DIR/review.md` (rendered markdown with quote-validation tags); fall back to `$RUN_DIR/final.txt` only if `review.md` is absent (schema parse failed). Print its complete contents under `### Codex review`: verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), validation of each Claude finding (CONFIRMED / REFUTED / EXTENDED), and any new findings. The artifact file is the source, not the background shell's stdout.
+`Read` `$RUN_DIR/review.md` (rendered markdown with quote-validation tags); fall back to `$RUN_DIR/final.txt` only if `review.md` is absent (schema parse failed). Print its complete contents under `### Codex review`: verdict (`AUDIT CLEAN` / `NEEDS REVISION` / `CRITICAL ISSUES`), validation of each Claude finding (CONFIRMED / REFUTED / EXTENDED), and any new findings. The artifact file is the source, not the background shell's stdout. Printing it is a gate: after that `Read`, emit the full section and the bridge line before any other tool call — no validation `Read`/`Grep`, no plan edit until the review is visible in chat.
 
 Then print this exact bridge line:
 
@@ -182,7 +182,7 @@ Then print this exact bridge line:
 ## 6. CLAUDE VALIDATES EVERY FINDING
 
 <investigate_before_answering>
-Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation` — **a chat deliverable per step 5's contract** — before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes.
+Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation` — **a chat deliverable per step 5's contract** — before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes. This is also a gate: steps 7 and 8 — plan edits and `ExitPlanMode` — wait until the full section is in chat.
 </investigate_before_answering>
 
 For every Codex finding (validation of existing + NEW), fill all five lines:

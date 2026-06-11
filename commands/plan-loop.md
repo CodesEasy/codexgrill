@@ -123,10 +123,10 @@ Wait for the user. Do not call `ExitPlanMode`.
 ### C. PRINT CODEX'S REVIEW + BRIDGE
 
 <chat_deliverables>
-The user cannot see wrapper stdout, `$RUN_DIR` files, or tool results — the only way Codex's review and your validation ever reach them is the text you print in chat. `### Codex review (iter <i>)`, `### Claude validation (iter <i>)`, and finalization's `### Final Claude validation` are the product of this command, not status narration, so general guidance to keep between-tool-call text brief or to drop low-impact detail does not apply to them. Print each one as ordinary chat markdown, complete — every finding, every template line — even when it runs to hundreds of lines. A summary, an excerpt, a pointer to a file, or content that exists only in thinking does not count as printing them.
+The user cannot see wrapper stdout, `$RUN_DIR` files, or tool results — the only way Codex's review and your validation ever reach them is the text you print in chat. `### Codex review (iter <i>)`, `### Claude validation (iter <i>)`, and finalization's `### Final Claude validation` are the product of this command, not status narration, so general guidance to keep between-tool-call text brief or to drop low-impact detail does not apply to them. Print each one as ordinary chat markdown, complete — every finding, every template line — even when it runs to hundreds of lines. A summary, an excerpt, a pointer to a file, or content that exists only in thinking does not count as printing them. In this harness every text block you emit renders in the user's transcript and persists — including text between tool calls — so mid-turn printing is real delivery; any general caution that between-tool-call text may not be shown does not apply here.
 </chat_deliverables>
 
-`Read` `$RUN_DIR/final-iter<i>.txt` — the authoritative copy of what the wrapper printed (background-shell stdout can truncate) — and print its complete contents under `### Codex review (iter <i>)`: verdict (SOUND / NEEDS REVISION / FUNDAMENTAL ISSUES) and all findings.
+`Read` `$RUN_DIR/final-iter<i>.txt` — the authoritative copy of what the wrapper printed (background-shell stdout can truncate) — and print its complete contents under `### Codex review (iter <i>)`: verdict (SOUND / NEEDS REVISION / FUNDAMENTAL ISSUES) and all findings. Printing it is a gate: after that `Read`, emit the full section and the bridge line before any other tool call — no state.json edit, no validation `Read`/`Grep`, no plan edit until the review is visible in chat.
 
 Then print this exact bridge line:
 
@@ -139,7 +139,7 @@ Then print this exact bridge line:
 ### E. CLAUDE VALIDATES EVERY FINDING
 
 <investigate_before_answering>
-Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` in this iteration before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation (iter <i>)` — **a chat deliverable per step C's contract** — before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes.
+Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` in this iteration before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation (iter <i>)` — **a chat deliverable per step C's contract** — before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes. This is also a gate on the loop's bookkeeping: steps F (refuted-log), G (state.json), and I (plan edit) all wait until the full section is in chat.
 </investigate_before_answering>
 
 For every finding, fill all four lines:
@@ -279,7 +279,7 @@ Continue to the next iteration. As you end that turn — after the next iteratio
 
 > Iteration <i>: Codex <verdict> · validation: <N> confirmed / <M> refuted / <K> unverifiable · plan updated · iteration <i+1> running.
 
-This one closing recap is the single exception to step A's end-turn-and-do-nothing rule; it supplements the full sections printed above and never replaces them.
+This one closing recap is the single exception to step A's end-turn-and-do-nothing rule; it supplements the full sections printed above and never replaces them. If either section is somehow missing from this turn's visible output, print it here in full before the recap — that is gate-failure recovery, not an alternative placement.
 
 ### Cap reached without converging
 
