@@ -139,7 +139,7 @@ Then print this exact bridge line:
 ### E. CLAUDE VALIDATES EVERY FINDING
 
 <investigate_before_answering>
-Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` in this iteration before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation (iter <i>)` — **a chat deliverable per step C's contract** — before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes. This is also a gate on the loop's bookkeeping: steps F (refuted-log), G (state.json), and I (plan edit) all wait until the full section is in chat.
+Codex is not an authority — it can mis-cite a line or misread control flow, so your own fresh read is the safeguard. Stay skeptical by default. Read the cited file with `Read` in this iteration before you mark any verdict — never rule from context memory alone. If you haven't freshly read the code, the verdict is UNVERIFIABLE. Print the full `### Claude validation (iter <i>)` — **a chat deliverable per step C's contract** — before any edit to `PLAN_PATH`, so the user sees every verdict before the plan changes. It gates order, not the turn: once the section is in chat, carry straight on through the rest of the iteration — printing a deliverable never ends a turn; only step A's wait for Codex does.
 </investigate_before_answering>
 
 For every finding, fill all four lines:
